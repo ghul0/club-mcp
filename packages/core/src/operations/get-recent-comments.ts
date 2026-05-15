@@ -8,19 +8,23 @@ import { parseSince } from '../date.js';
 import { paginate, type Page, type PageRequest } from '../pagination.js';
 import { concurrentMap } from '../concurrency.js';
 import { FeedsListResponseSchema, type Feed } from '../schemas/feeds.js';
-import { CommentsResponseSchema, CommentSchema, type Comment } from '../schemas/comments.js';
+import {
+  CommentsResponseSchema,
+  PublicCommentSchema,
+  toPublicComment,
+  type Comment,
+  type PublicComment,
+} from '../schemas/comments.js';
 
-export const RecentCommentItemSchema = z.object({
-  feed: z.object({
-    id: z.coerce.number().int().positive(),
-    title: z.string().nullable().optional(),
-  }),
-  comment: CommentSchema,
-});
+export const RecentCommentItemSchema = PublicCommentSchema;
 
 export const GetRecentCommentsOutputSchema = z.object({
   comments: z.array(RecentCommentItemSchema),
   since: z.string(),
+  scan_metadata: z.object({
+    scanned_feeds: z.number().int().nonnegative(),
+    scanned_comments: z.number().int().nonnegative(),
+  }),
 });
 
 export const GetRecentCommentsInputSchema = z
@@ -37,14 +41,15 @@ export const GetRecentCommentsInputSchema = z
 export type GetRecentCommentsInput = z.input<typeof GetRecentCommentsInputSchema>;
 type ResolvedInput = z.output<typeof GetRecentCommentsInputSchema>;
 
-export type RecentCommentItem = {
-  readonly feed: Pick<Feed, 'id' | 'title'>;
-  readonly comment: Comment;
-};
+export type RecentCommentItem = PublicComment;
 
 export type GetRecentCommentsOutput = {
   readonly comments: readonly RecentCommentItem[];
   readonly since: string;
+  readonly scan_metadata: {
+    readonly scanned_feeds: number;
+    readonly scanned_comments: number;
+  };
 };
 
 const FEEDS_PER_PAGE = 100;
@@ -95,11 +100,17 @@ const feedActivityAt = (feed: Feed): string | undefined => {
   return undefined;
 };
 
+interface ActivityFeedsResult {
+  readonly feeds: ReadonlyArray<Feed>;
+  readonly scannedFeeds: number;
+}
+
 const fetchActivityFeeds = async (
   client: GetClient,
   since: string,
   scanFeedLimit: number,
-): Promise<Result<ReadonlyArray<Feed>, AppError>> => {
+): Promise<Result<ActivityFeedsResult, AppError>> => {
+  let scannedFeeds = 0;
   const fetchPage = async (
     req: PageRequest,
   ): Promise<Result<Page<Feed>, AppError>> => {
@@ -112,6 +123,7 @@ const fetchActivityFeeds = async (
       return err(response.error);
     }
     const { items, hasMore } = extractFeedPage(response.value, req.perPage);
+    scannedFeeds += items.length;
     const kept: Feed[] = [];
     let stop = false;
     for (const item of items) {
@@ -129,12 +141,21 @@ const fetchActivityFeeds = async (
     });
   };
 
-  return paginate<Feed>(fetchPage, {
+  const paged = await paginate<Feed>(fetchPage, {
     maxItems: scanFeedLimit,
     perPage: FEEDS_PER_PAGE,
     maxPages: 20,
   });
+  if (!paged.ok) {
+    return err(paged.error);
+  }
+  return ok({ feeds: paged.value, scannedFeeds });
 };
+
+interface CommentFetchResult {
+  readonly comments: ReadonlyArray<Comment>;
+  readonly scannedComments: number;
+}
 
 const fetchCommentsForFeed = async (
   client: GetClient,
@@ -142,8 +163,9 @@ const fetchCommentsForFeed = async (
   since: string,
   includeEdits: boolean,
   maxComments: number,
-): Promise<Result<ReadonlyArray<Comment>, AppError>> => {
+): Promise<Result<CommentFetchResult, AppError>> => {
   const path = `/feeds/${String(feedId)}/comments`;
+  let scannedComments = 0;
   const fetchPage = async (
     req: PageRequest,
   ): Promise<Result<Page<Comment>, AppError>> => {
@@ -155,6 +177,7 @@ const fetchCommentsForFeed = async (
       return err(response.error);
     }
     const { items, hasMore } = extractCommentPage(response.value, req.perPage);
+    scannedComments += items.length;
     return ok({ items, hasMore, totalScanned: items.length });
   };
 
@@ -175,7 +198,7 @@ const fetchCommentsForFeed = async (
     }
     return false;
   });
-  return ok(filtered);
+  return ok({ comments: filtered, scannedComments });
 };
 
 export const getRecentComments = async (
@@ -199,19 +222,25 @@ export const getRecentComments = async (
   if (!feedsResult.ok) {
     return err(feedsResult.error);
   }
-  const feeds = feedsResult.value;
+  const feeds = feedsResult.value.feeds;
+  const scannedFeeds = feedsResult.value.scannedFeeds;
 
   if (feeds.length === 0) {
-    return ok({ comments: [], since });
+    return ok({
+      comments: [],
+      since,
+      scan_metadata: { scanned_feeds: scannedFeeds, scanned_comments: 0 },
+    });
   }
 
-  const perFeedResults = await concurrentMap<Feed, Result<ReadonlyArray<Comment>, AppError>>(
+  const perFeedResults = await concurrentMap<Feed, Result<CommentFetchResult, AppError>>(
     feeds,
     (f) => fetchCommentsForFeed(client, f.id, since, resolved.include_edits, resolved.comment_per_feed_limit),
     resolved.concurrency,
   );
 
-  const collected: RecentCommentItem[] = [];
+  const collected: PublicComment[] = [];
+  let scannedComments = 0;
   for (let i = 0; i < perFeedResults.length; i++) {
     const r = perFeedResults[i];
     const f = feeds[i];
@@ -221,16 +250,18 @@ export const getRecentComments = async (
     if (!r.ok) {
       return err(r.error);
     }
-    for (const c of r.value) {
-      collected.push({ feed: { id: f.id, title: f.title }, comment: c });
+    scannedComments += r.value.scannedComments;
+    for (const c of r.value.comments) {
       if (collected.length >= resolved.limit) {
         break;
       }
-    }
-    if (collected.length >= resolved.limit) {
-      break;
+      collected.push(toPublicComment(c, { feed: f }));
     }
   }
 
-  return ok({ comments: collected, since });
+  return ok({
+    comments: collected,
+    since,
+    scan_metadata: { scanned_feeds: scannedFeeds, scanned_comments: scannedComments },
+  });
 };

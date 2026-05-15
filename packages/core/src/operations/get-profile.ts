@@ -8,11 +8,17 @@ import {
   ProfileResponseSchema,
   ProfileSpacesResponseSchema,
   ProfileCommentsResponseSchema,
-  ProfileSchema,
-  type Profile,
+  PublicProfileSchema,
+  toPublicProfile,
   type ProfileSpace,
+  type PublicProfile,
 } from '../schemas/profile.js';
-import { CommentSchema, type Comment } from '../schemas/comments.js';
+import {
+  PublicCommentSchema,
+  toPublicComment,
+  type Comment,
+  type PublicComment,
+} from '../schemas/comments.js';
 
 const ProfileSpaceOutSchema = z.object({
   id: z.coerce.number().int().positive().optional(),
@@ -22,9 +28,9 @@ const ProfileSpaceOutSchema = z.object({
 });
 
 export const GetProfileOutputSchema = z.object({
-  profile: ProfileSchema,
+  profile: PublicProfileSchema,
   spaces: z.array(ProfileSpaceOutSchema).optional(),
-  recent_comments: z.array(CommentSchema).optional(),
+  recent_comments: z.array(PublicCommentSchema).optional(),
 });
 
 const USERNAME_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
@@ -42,9 +48,9 @@ export type GetProfileInput = z.input<typeof GetProfileInputSchema>;
 type ResolvedInput = z.output<typeof GetProfileInputSchema>;
 
 export interface GetProfileOutput {
-  readonly profile: Profile;
+  readonly profile: PublicProfile;
   readonly spaces?: readonly ProfileSpace[];
-  readonly recent_comments?: readonly Comment[];
+  readonly recent_comments?: readonly PublicComment[];
 }
 
 const formatIssues = (error: z.ZodError): string => {
@@ -107,14 +113,15 @@ export const getProfile = async (
     );
   }
 
+  const publicProfile = toPublicProfile(profileResponse.value.profile);
   if (subFetches.length === 0) {
-    return ok({ profile: profileResponse.value.profile });
+    return ok({ profile: publicProfile });
   }
 
   const subResults = await Promise.all(subFetches);
   let cursor = 0;
   let spaces: readonly ProfileSpace[] | undefined;
-  let recentComments: readonly Comment[] | undefined;
+  let recentComments: readonly PublicComment[] | undefined;
 
   if (resolved.include_spaces) {
     const r = subResults[cursor];
@@ -136,13 +143,14 @@ export const getProfile = async (
     if (!r.ok) {
       return err(r.error);
     }
-    recentComments = extractProfileComments(
+    const raw = extractProfileComments(
       r.value as z.infer<typeof ProfileCommentsResponseSchema>,
     );
+    recentComments = raw.map((c) => toPublicComment(c));
   }
 
   const output: GetProfileOutput = {
-    profile: profileResponse.value.profile,
+    profile: publicProfile,
     ...(spaces !== undefined ? { spaces } : {}),
     ...(recentComments !== undefined ? { recent_comments: recentComments } : {}),
   };

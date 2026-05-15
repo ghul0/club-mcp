@@ -4,14 +4,20 @@ import type { Result } from '../result.js';
 import { err, ok } from '../result.js';
 import type { AppError } from '../errors.js';
 import { validationError } from '../errors.js';
-import type { Page, PageRequest } from '../pagination.js';
-import { paginate } from '../pagination.js';
 import { parseSince } from '../date.js';
-import type { Comment } from '../schemas/comments.js';
-import { CommentsResponseSchema, CommentSchema } from '../schemas/comments.js';
+import type { Comment, PublicComment } from '../schemas/comments.js';
+import {
+  CommentsResponseSchema,
+  PublicCommentSchema,
+  toPublicComment,
+} from '../schemas/comments.js';
 
 export const GetUserCommentsOutputSchema = z.object({
-  comments: z.array(CommentSchema),
+  comments: z.array(PublicCommentSchema),
+  pagination: z.object({
+    current_page: z.number().int().positive(),
+    has_more: z.boolean(),
+  }),
 });
 
 const USERNAME_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
@@ -27,7 +33,11 @@ export const GetUserCommentsInputSchema = z
 export type GetUserCommentsInput = z.input<typeof GetUserCommentsInputSchema>;
 
 export interface GetUserCommentsOutput {
-  readonly comments: readonly Comment[];
+  readonly comments: readonly PublicComment[];
+  readonly pagination: {
+    readonly current_page: number;
+    readonly has_more: boolean;
+  };
 }
 
 const PER_PAGE = 100;
@@ -43,26 +53,30 @@ const backfillAuthor = (comment: Comment): Comment => {
   return { ...comment, author: comment.xprofile };
 };
 
+interface ExtractedCommentPage {
+  readonly items: ReadonlyArray<Comment>;
+  readonly hasMore: boolean;
+}
+
 const extractPage = (
   envelope: z.infer<typeof CommentsResponseSchema>,
   perPage: number,
-): Page<Comment> => {
+): ExtractedCommentPage => {
   const raw = envelope.comments;
   if (Array.isArray(raw)) {
     const items = raw.map(backfillAuthor);
-    return {
-      items,
-      hasMore: items.length >= perPage,
-      totalScanned: items.length,
-    };
+    return { items, hasMore: items.length >= perPage };
   }
   const items = raw.data.map(backfillAuthor);
   const hasMore = raw.has_more ?? items.length >= perPage;
-  return {
-    items,
-    hasMore,
-    totalScanned: items.length,
-  };
+  return { items, hasMore };
+};
+
+const passesSince = (c: Comment, threshold: string): boolean => {
+  if (c.created_at >= threshold) {
+    return true;
+  }
+  return typeof c.updated_at === 'string' && c.updated_at >= threshold;
 };
 
 export const getUserComments = async (
@@ -90,43 +104,43 @@ export const getUserComments = async (
 
   const path = `/profile/${encodeURIComponent(username)}/comments`;
 
-  const fetchPage = async (
-    req: PageRequest,
-  ): Promise<Result<Page<Comment>, AppError>> => {
+  const collected: Comment[] = [];
+  let currentPage = 1;
+  let hasMore = false;
+
+  while (currentPage <= MAX_PAGES) {
     const response = await client.get(path, CommentsResponseSchema, {
-      page: req.page,
-      per_page: req.perPage,
+      page: currentPage,
+      per_page: PER_PAGE,
     });
     if (!response.ok) {
       return err(response.error);
     }
-    return ok(extractPage(response.value, req.perPage));
-  };
+    const page = extractPage(response.value, PER_PAGE);
+    hasMore = page.hasMore;
 
-  const result = await paginate(fetchPage, {
-    maxItems: limit,
-    maxPages: MAX_PAGES,
-    perPage: PER_PAGE,
-  });
+    for (const c of page.items) {
+      if (sinceTimestamp !== undefined && !passesSince(c, sinceTimestamp)) {
+        continue;
+      }
+      if (collected.length >= limit) {
+        break;
+      }
+      collected.push(c);
+    }
 
-  if (!result.ok) {
-    return err(result.error);
+    if (collected.length >= limit) {
+      break;
+    }
+    if (!hasMore) {
+      break;
+    }
+    currentPage += 1;
   }
 
-  const all = result.value;
-  if (sinceTimestamp === undefined) {
-    return ok({ comments: all });
-  }
-
-  const threshold = sinceTimestamp;
-  const filtered = all.filter((c) => {
-    if (c.created_at >= threshold) {
-      return true;
-    }
-    if (typeof c.updated_at === 'string' && c.updated_at >= threshold) {
-      return true;
-    }
-    return false;
+  const comments: PublicComment[] = collected.map((c) => toPublicComment(c));
+  return ok({
+    comments,
+    pagination: { current_page: currentPage, has_more: hasMore },
   });
-  return ok({ comments: filtered });
 };

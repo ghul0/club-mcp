@@ -6,11 +6,30 @@ import { err, ok } from '../result.js';
 import { validationError } from '../errors.js';
 import { parseSince } from '../date.js';
 import { concurrentMap } from '../concurrency.js';
-import { MembersResponseSchema, MemberSchema, type Member } from '../schemas/members.js';
-import { FeedsListResponseSchema, FeedSchema, type Feed } from '../schemas/feeds.js';
-import { CommentsResponseSchema, CommentSchema, type Comment } from '../schemas/comments.js';
+import {
+  MembersResponseSchema,
+  PublicMemberSchema,
+  toPublicMember,
+  type Member,
+  type PublicMember,
+} from '../schemas/members.js';
+import {
+  FeedsListResponseSchema,
+  PublicFeedSchema,
+  toPublicFeed,
+  type Feed,
+  type PublicFeed,
+} from '../schemas/feeds.js';
+import {
+  CommentsResponseSchema,
+  PublicCommentSchema,
+  toPublicComment,
+  type Comment,
+  type PublicComment,
+} from '../schemas/comments.js';
 
 const MAX_SCANNED_COMMENTS = 2000;
+const UPSTREAM_PER_PAGE = 100;
 
 const hasControlChars = (value: string): boolean => {
   for (let i = 0; i < value.length; i += 1) {
@@ -49,9 +68,9 @@ export const SearchResultSchema = z.object({
   kind: z.enum(['member', 'post', 'comment']),
   matched_field: z.string(),
   score: z.number().optional(),
-  member: MemberSchema.optional(),
-  post: FeedSchema.optional(),
-  comment: CommentSchema.optional(),
+  member: PublicMemberSchema.optional(),
+  post: PublicFeedSchema.optional(),
+  comment: PublicCommentSchema.optional(),
 });
 
 export const SearchScanMetadataSchema = z.object({
@@ -112,15 +131,23 @@ const extractComments = (raw: z.infer<typeof CommentsResponseSchema>): readonly 
 const fetchMembers = async (
   client: GetClient,
   input: SearchContentParsed,
+  sinceTimestamp: string | undefined,
 ): Promise<Result<readonly Member[], AppError>> => {
   const res = await client.get('/members', MembersResponseSchema, {
     search: input.query,
-    per_page: input.limit,
+    per_page: UPSTREAM_PER_PAGE,
   });
   if (!res.ok) {
     return err(res.error);
   }
-  return ok(extractMembers(res.value).slice(0, input.limit));
+  const all = extractMembers(res.value);
+  if (sinceTimestamp === undefined) {
+    return ok(all);
+  }
+  const filtered = all.filter(
+    (m) => typeof m.last_activity === 'string' && m.last_activity >= sinceTimestamp,
+  );
+  return ok(filtered);
 };
 
 const fetchPosts = async (
@@ -129,13 +156,13 @@ const fetchPosts = async (
 ): Promise<Result<readonly Feed[], AppError>> => {
   const res = await client.get('/feeds', FeedsListResponseSchema, {
     search: input.query,
-    per_page: input.limit,
+    per_page: UPSTREAM_PER_PAGE,
     order_by_type: 'new_activity',
   });
   if (!res.ok) {
     return err(res.error);
   }
-  return ok(extractFeeds(res.value).slice(0, input.limit));
+  return ok(extractFeeds(res.value));
 };
 
 const matchesQuery = (text: string | null | undefined, needle: string): boolean => {
@@ -157,7 +184,7 @@ const fetchCommentsForScope = async (
   sinceTimestamp: string | undefined,
 ): Promise<Result<CommentScanOutcome, AppError>> => {
   const feedsRes = await client.get('/feeds', FeedsListResponseSchema, {
-    per_page: input.scan_feed_limit,
+    per_page: UPSTREAM_PER_PAGE,
     order_by_type: 'new_activity',
   });
   if (!feedsRes.ok) {
@@ -180,7 +207,7 @@ const fetchCommentsForScope = async (
       }
       const path = `/feeds/${feed.id.toString()}/comments`;
       const res = await client.get(path, CommentsResponseSchema, {
-        per_page: input.limit,
+        per_page: UPSTREAM_PER_PAGE,
       });
       if (!res.ok) {
         return err(res.error);
@@ -304,7 +331,7 @@ export const searchContent = async (
   }
 
   const membersPromise: Promise<Result<readonly Member[], AppError>> = parameters.include_members
-    ? fetchMembers(client, parameters)
+    ? fetchMembers(client, parameters, sinceTimestamp)
     : Promise.resolve(ok<readonly Member[]>([]));
   const postsPromise: Promise<Result<readonly Feed[], AppError>> = parameters.include_posts
     ? fetchPosts(client, parameters)
@@ -329,40 +356,69 @@ export const searchContent = async (
     return err(commentsResult.error);
   }
 
+  const limit = parameters.limit;
   const members = membersResult.value;
   const posts = postsResult.value.filter((p) => passesSince(p.created_at, p.updated_at, sinceTimestamp));
   const commentHits = commentsResult.value.hits;
 
+  const feedById = new Map<number, Feed>();
+  for (const p of posts) {
+    feedById.set(p.id, p);
+  }
+
   const results: SearchResult[] = [];
+  let memberCount = 0;
+  let postCount = 0;
+  let commentCount = 0;
+
   for (const member of members) {
+    if (results.length >= limit) {
+      break;
+    }
+    const publicMember: PublicMember = toPublicMember(member);
     results.push({
       kind: 'member',
       matched_field: matchedFieldForMember(member, parameters.query),
-      member,
+      member: publicMember,
     });
+    memberCount += 1;
   }
   for (const post of posts) {
+    if (results.length >= limit) {
+      break;
+    }
+    const publicPost: PublicFeed = toPublicFeed(post);
     results.push({
       kind: 'post',
       matched_field: matchedFieldForPost(post, parameters.query),
-      post,
+      post: publicPost,
     });
+    postCount += 1;
   }
   for (const hit of commentHits) {
+    if (results.length >= limit) {
+      break;
+    }
+    const feedForComment = feedById.get(hit.feedId);
+    const publicComment: PublicComment = toPublicComment(
+      hit.comment,
+      feedForComment !== undefined ? { feed: feedForComment } : undefined,
+    );
     results.push({
       kind: 'comment',
       matched_field: matchedFieldForComment(hit.comment, parameters.query),
-      comment: hit.comment,
+      comment: publicComment,
     });
+    commentCount += 1;
   }
 
   const output: SearchContentOutput = {
     query: parameters.query,
     results,
     counts: {
-      members: members.length,
-      posts: posts.length,
-      comments: commentHits.length,
+      members: memberCount,
+      posts: postCount,
+      comments: commentCount,
     },
     scan_metadata: {
       scanned_feeds: commentsResult.value.scannedFeeds,

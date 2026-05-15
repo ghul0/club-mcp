@@ -164,7 +164,7 @@ describe('searchContent', () => {
     expect(result.error.code).toBe('validation');
   });
 
-  it('caps members and posts at limit', async () => {
+  it('caps combined results at the global limit (members fill first, posts next)', async () => {
     const manyMembers = Array.from({ length: 10 }, (_, i) => memberFixture(i + 1, `User${(i + 1).toString()}`));
     const manyFeeds = Array.from({ length: 10 }, (_, i) => feedFixture(i + 1, `topic ${(i + 1).toString()}`));
     const { client } = makeClient((path) => {
@@ -176,13 +176,16 @@ describe('searchContent', () => {
     const result = await searchContent(client, {
       query: 'topic',
       include_comments: false,
-      limit: 3,
+      limit: 5,
     });
 
     expect(isOk(result)).toBe(true);
     if (!isOk(result)) return;
-    expect(result.value.counts.members).toBe(3);
-    expect(result.value.counts.posts).toBe(3);
+    const total = result.value.counts.members + result.value.counts.posts + result.value.counts.comments;
+    expect(total).toBe(5);
+    expect(result.value.results.length).toBe(5);
+    expect(result.value.counts.members).toBe(5);
+    expect(result.value.counts.posts).toBe(0);
   });
 
   it('filters comments by query substring and caps globally', async () => {
@@ -237,7 +240,7 @@ describe('searchContent', () => {
     expect(result.value.counts.comments).toBe(2);
     const hits = result.value.results.filter((r) => r.kind === 'comment');
     for (const item of hits) {
-      expect(String(item.comment?.message ?? '')).toContain('needle');
+      expect(String(item.comment?.message_text ?? '')).toContain('needle');
     }
   });
 

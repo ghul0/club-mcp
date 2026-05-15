@@ -5,15 +5,17 @@ import { err, ok } from '../result.js';
 import type { AppError } from '../errors.js';
 import { validationError } from '../errors.js';
 import { concurrentMap } from '../concurrency.js';
-import { MembersResponseSchema, MemberSchema, type Member } from '../schemas/members.js';
-import { SpacesResponseSchema, SpaceListItemSchema, type SpaceListItem } from '../schemas/spaces.js';
+import { MembersResponseSchema, type Member } from '../schemas/members.js';
+import {
+  SpacesResponseSchema,
+  PublicSpaceSchema,
+  toPublicSpace,
+  type SpaceListItem,
+  type PublicSpace,
+} from '../schemas/spaces.js';
 
 export const ListSpacesOutputSchema = z.object({
-  spaces: z.array(
-    SpaceListItemSchema.extend({
-      members: z.array(MemberSchema).optional(),
-    }),
-  ),
+  spaces: z.array(PublicSpaceSchema),
 });
 
 export const ListSpacesInputSchema = z
@@ -25,12 +27,10 @@ export const ListSpacesInputSchema = z
 
 export type ListSpacesInput = z.input<typeof ListSpacesInputSchema>;
 
-export type SpaceWithMembers = SpaceListItem & {
-  readonly members?: readonly Member[];
-};
+export type SpaceWithMembers = PublicSpace;
 
 export interface ListSpacesOutput {
-  readonly spaces: readonly SpaceWithMembers[];
+  readonly spaces: readonly PublicSpace[];
 }
 
 const SPACE_MEMBER_CONCURRENCY = 4;
@@ -93,7 +93,7 @@ export const listSpaces = async (
   const spaces = extractSpaces(response.value);
 
   if (!include_members || spaces.length === 0) {
-    return ok({ spaces });
+    return ok({ spaces: spaces.map((s) => toPublicSpace(s)) });
   }
 
   const memberResults = await concurrentMap(
@@ -102,7 +102,7 @@ export const listSpaces = async (
     SPACE_MEMBER_CONCURRENCY,
   );
 
-  const enriched: SpaceWithMembers[] = [];
+  const enriched: PublicSpace[] = [];
   for (let i = 0; i < spaces.length; i += 1) {
     const space = spaces[i];
     const result = memberResults[i];
@@ -112,7 +112,7 @@ export const listSpaces = async (
     if (!result.ok) {
       return err(result.error);
     }
-    enriched.push({ ...space, members: result.value });
+    enriched.push(toPublicSpace(space, result.value));
   }
   return ok({ spaces: enriched });
 };

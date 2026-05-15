@@ -5,18 +5,15 @@ import type { AppError } from '../errors.js';
 import { err, ok } from '../result.js';
 import { validationError } from '../errors.js';
 import { parseSince } from '../date.js';
-import { FeedSchema } from '../schemas/feeds.js';
+import { PublicFeedSchema } from '../schemas/feeds.js';
+import { PublicCommentSchema, type PublicComment } from '../schemas/comments.js';
 import { getRecentPosts, type GetRecentPostsOutput } from './get-recent-posts.js';
-import {
-  getRecentComments,
-  RecentCommentItemSchema,
-  type RecentCommentItem,
-} from './get-recent-comments.js';
+import { getRecentComments } from './get-recent-comments.js';
 
 export const GetSinceSummaryOutputSchema = z.object({
-  new_posts: z.array(FeedSchema),
-  new_comments: z.array(RecentCommentItemSchema),
-  edited_comments: z.array(RecentCommentItemSchema),
+  new_posts: z.array(PublicFeedSchema),
+  new_comments: z.array(PublicCommentSchema),
+  edited_comments: z.array(PublicCommentSchema),
   counts: z.object({
     new_posts: z.number().int().nonnegative(),
     new_comments: z.number().int().nonnegative(),
@@ -44,8 +41,8 @@ type ResolvedInput = z.output<typeof GetSinceSummaryInputSchema>;
 
 export type GetSinceSummaryOutput = {
   readonly new_posts: GetRecentPostsOutput['posts'];
-  readonly new_comments: readonly RecentCommentItem[];
-  readonly edited_comments: readonly RecentCommentItem[];
+  readonly new_comments: readonly PublicComment[];
+  readonly edited_comments: readonly PublicComment[];
   readonly counts: {
     readonly new_posts: number;
     readonly new_comments: number;
@@ -105,15 +102,12 @@ export const getSinceSummary = async (
     return err(commentsResult.error);
   }
 
-  const newComments: RecentCommentItem[] = [];
-  const editedComments: RecentCommentItem[] = [];
+  const newComments: PublicComment[] = [];
+  const editedComments: PublicComment[] = [];
   for (const item of commentsResult.value.comments) {
-    if (item.comment.created_at >= sinceTimestamp) {
+    if (item.created_at >= sinceTimestamp) {
       newComments.push(item);
-    } else if (
-      typeof item.comment.updated_at === 'string' &&
-      item.comment.updated_at >= sinceTimestamp
-    ) {
+    } else if (typeof item.updated_at === 'string' && item.updated_at >= sinceTimestamp) {
       editedComments.push(item);
     }
   }
@@ -130,8 +124,8 @@ export const getSinceSummary = async (
       edited_comments: editedComments.length,
     },
     scan_metadata: {
-      scanned_feeds: 0,
-      scanned_comments: commentsResult.value.comments.length,
+      scanned_feeds: commentsResult.value.scan_metadata.scanned_feeds,
+      scanned_comments: commentsResult.value.scan_metadata.scanned_comments,
       since: sinceTimestamp,
       generated_at: generatedAt,
     },

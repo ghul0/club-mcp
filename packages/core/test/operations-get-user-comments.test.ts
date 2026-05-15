@@ -107,8 +107,9 @@ describe('getUserComments', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
     const comment = result.value.comments[0];
-    expect(comment?.author).toEqual(xp);
-    expect(comment?.xprofile).toEqual(xp);
+    expect(comment?.author?.user_id).toBe(xp.user_id);
+    expect(comment?.author?.username).toBe(xp.username);
+    expect(comment?.author?.display_name).toBe(xp.display_name);
   });
 
   it('leaves comments with an existing author unchanged', async () => {
@@ -124,7 +125,7 @@ describe('getUserComments', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
-    expect(result.value.comments[0]?.author).toEqual(existing);
+    expect(result.value.comments[0]?.author?.username).toBe(existing.username);
   });
 
   it('does not invent an author when neither author nor xprofile is present', async () => {
@@ -135,7 +136,6 @@ describe('getUserComments', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
     expect(result.value.comments[0]?.author).toBeUndefined();
-    expect(result.value.comments[0]?.xprofile).toBeUndefined();
   });
 
   it('caps results at limit even if upstream has more pages', async () => {

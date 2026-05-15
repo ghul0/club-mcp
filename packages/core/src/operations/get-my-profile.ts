@@ -4,13 +4,13 @@ import type { Result } from '../result.js';
 import { err, ok } from '../result.js';
 import type { AppError } from '../errors.js';
 import { validationError } from '../errors.js';
-import { redactKeys } from '../redaction.js';
 import {
   ProfileResponseSchema,
   ProfileSpacesResponseSchema,
-  ProfileSchema,
-  type Profile,
+  PublicProfileSchema,
+  toPublicProfile,
   type ProfileSpace,
+  type PublicProfile,
 } from '../schemas/profile.js';
 
 const ProfileSpaceOutSchema = z.object({
@@ -21,21 +21,9 @@ const ProfileSpaceOutSchema = z.object({
 });
 
 export const GetMyProfileOutputSchema = z.object({
-  profile: ProfileSchema,
+  profile: PublicProfileSchema,
   spaces: z.array(ProfileSpaceOutSchema).optional(),
 });
-
-const PRIVATE_FIELD_KEYS: ReadonlyArray<string> = [
-  'email',
-  'user_email',
-  'email_address',
-  'phone',
-  'phone_number',
-  'mobile',
-  'address',
-  'ip_address',
-  'last_login_ip',
-];
 
 export const GetMyProfileInputSchema = z
   .object({
@@ -48,7 +36,7 @@ export type GetMyProfileInput = z.input<typeof GetMyProfileInputSchema>;
 type ResolvedInput = z.output<typeof GetMyProfileInputSchema>;
 
 export interface GetMyProfileOutput {
-  readonly profile: Profile;
+  readonly profile: PublicProfile;
   readonly spaces?: readonly ProfileSpace[];
 }
 
@@ -74,9 +62,6 @@ const extractSpaces = (
   return spaces.data;
 };
 
-const redactPrivateFields = (profile: Profile): Profile =>
-  redactKeys(profile, { blocklistKeys: PRIVATE_FIELD_KEYS });
-
 export const getMyProfile = async (
   client: GetClient,
   input?: GetMyProfileInput,
@@ -91,9 +76,9 @@ export const getMyProfile = async (
   if (!profileResponse.ok) {
     return err(profileResponse.error);
   }
-  const profile = resolved.include_private_fields
-    ? profileResponse.value.profile
-    : redactPrivateFields(profileResponse.value.profile);
+  const profile = toPublicProfile(profileResponse.value.profile, {
+    includePrivateFields: resolved.include_private_fields,
+  });
 
   if (!resolved.include_spaces) {
     return ok({ profile });

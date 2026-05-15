@@ -8,6 +8,7 @@ import { CoursesResponseSchema, CourseListItemSchema, type CourseListItem } from
 
 export const ListCoursesOutputSchema = z.object({
   courses: z.array(CourseListItemSchema),
+  count: z.number().int().nonnegative(),
 });
 
 export const ListCoursesInputSchema = z
@@ -20,6 +21,7 @@ export type ListCoursesInput = z.input<typeof ListCoursesInputSchema>;
 
 export interface ListCoursesOutput {
   readonly courses: readonly CourseListItem[];
+  readonly count: number;
 }
 
 const COURSES_PATH = '/courses/all-courses';
@@ -70,7 +72,8 @@ export const listCourses = async (
 
   const courses = extractCourses(response.value);
   if (include_sections) {
-    return ok({ courses });
+    return ok({ courses, count: courses.length });
   }
-  return ok({ courses: courses.map(stripSections) });
+  const stripped = courses.map(stripSections);
+  return ok({ courses: stripped, count: stripped.length });
 };

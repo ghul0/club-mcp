@@ -106,7 +106,7 @@ describe('getMyProfile', () => {
     expect(isOk(result)).toBe(true);
     if (!isOk(result)) return;
     const profile = result.value.profile as unknown as Record<string, unknown>;
-    expect(profile.email).toBe('[REDACTED]');
+    expect(profile.email).toBeUndefined();
   });
 
   it('preserves email when include_private_fields=true', async () => {

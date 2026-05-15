@@ -5,11 +5,15 @@ import { err, ok } from '../result.js';
 import type { AppError } from '../errors.js';
 import { parseSince } from '../date.js';
 import { paginate } from '../pagination.js';
-import type { Feed } from '../schemas/feeds.js';
-import { FeedsListResponseSchema, FeedSchema } from '../schemas/feeds.js';
+import type { Feed, PublicFeed } from '../schemas/feeds.js';
+import {
+  FeedsListResponseSchema,
+  PublicFeedSchema,
+  toPublicFeed,
+} from '../schemas/feeds.js';
 
 export const GetRecentPostsOutputSchema = z.object({
-  posts: z.array(FeedSchema),
+  posts: z.array(PublicFeedSchema),
   since: z.string(),
 });
 
@@ -28,7 +32,7 @@ export type GetRecentPostsInput = z.input<typeof GetRecentPostsInputSchema>;
 type ResolvedInput = z.output<typeof GetRecentPostsInputSchema>;
 
 export interface GetRecentPostsOutput {
-  readonly posts: readonly Feed[];
+  readonly posts: readonly PublicFeed[];
   readonly since: string;
 }
 
@@ -128,10 +132,10 @@ export const getRecentPosts = async (
     return err(paged.error);
   }
 
-  const filtered: Feed[] = [];
+  const filtered: PublicFeed[] = [];
   for (const item of paged.value) {
     if (item.created_at >= sinceTimestamp) {
-      filtered.push(item);
+      filtered.push(toPublicFeed(item));
       if (filtered.length >= limit) {
         break;
       }
