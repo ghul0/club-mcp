@@ -18,3 +18,4 @@ export * from './operations/search-members.js';
 export * from './operations/get-feed.js';
 export * from './operations/get-feed-comments.js';
 export * from './operations/get-recent-posts.js';
+export * from './operations/list-courses.js';
