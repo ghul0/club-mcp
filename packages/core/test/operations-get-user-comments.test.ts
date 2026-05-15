@@ -230,4 +230,80 @@ describe('getUserComments', () => {
     if (result.ok) throw new Error('expected err');
     expect(result.error.code).toBe('upstream_not_found');
   });
+
+  it('surfaces post.id/title/permalink from raw upstream comment.post (Bucket P)', async () => {
+    const client = buildClient(() =>
+      ok({
+        comments: [
+          {
+            id: 501,
+            created_at: '2026-05-10 10:00:00',
+            message: 'with post info',
+            post: {
+              id: 9001,
+              title: 'Source thread',
+              permalink: 'https://example.test/p/9001',
+            },
+          },
+        ],
+      }),
+    );
+
+    const result = await getUserComments(client, { username: 'thomas' });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    const comment = result.value.comments[0];
+    expect(comment?.post?.id).toBe(9001);
+    expect(comment?.post?.title).toBe('Source thread');
+    expect(comment?.post?.permalink).toBe('https://example.test/p/9001');
+  });
+
+  it('sets pagination.has_more=true when limit truncates a page with remaining matching items (Bucket R)', async () => {
+    const NOW = new Date(Date.UTC(2026, 4, 15, 12, 0, 0));
+    const client = buildClient((_path, query) => {
+      const page = Number(query?.page ?? 1);
+      if (page !== 1) {
+        return ok({ comments: { data: [], has_more: false } });
+      }
+      return ok({
+        comments: {
+          data: [
+            makeComment(1, { created_at: '2026-05-10 10:00:00' }),
+            makeComment(2, { created_at: '2026-05-10 09:00:00' }),
+            makeComment(3, { created_at: '2026-05-10 08:00:00' }),
+          ],
+          has_more: false,
+        },
+      });
+    });
+
+    const result = await getUserComments(
+      client,
+      { username: 'thomas', since: '2026-05-01', limit: 2 },
+      NOW,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value.comments).toHaveLength(2);
+    expect(result.value.pagination.has_more).toBe(true);
+  });
+
+  it('sets pagination.has_more=false when scan exhausts upstream within limit (Bucket R)', async () => {
+    const client = buildClient(() =>
+      ok({
+        comments: {
+          data: [makeComment(1), makeComment(2)],
+          has_more: false,
+        },
+      }),
+    );
+
+    const result = await getUserComments(client, { username: 'thomas', limit: 50 });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value.pagination.has_more).toBe(false);
+  });
 });

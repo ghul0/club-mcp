@@ -56,25 +56,15 @@ const validateInput = (input: GetRecentPostsInput): Result<ResolvedInput, AppErr
 
 const extractFeeds = (
   envelope: z.infer<typeof FeedsListResponseSchema>,
+  perPage: number,
 ): { items: ReadonlyArray<Feed>; hasMore: boolean } => {
   const feeds = envelope.feeds;
   if (Array.isArray(feeds)) {
-    return { items: feeds, hasMore: false };
+    return { items: feeds, hasMore: feeds.length >= perPage };
   }
-  return { items: feeds.data, hasMore: feeds.has_more === true };
-};
-
-const oldestCreatedAt = (items: ReadonlyArray<Feed>): string | undefined => {
-  if (items.length === 0) {
-    return undefined;
-  }
-  let oldest = items[0]?.created_at;
-  for (const item of items) {
-    if (oldest === undefined || item.created_at < oldest) {
-      oldest = item.created_at;
-    }
-  }
-  return oldest;
+  const items = feeds.data;
+  const hasMore = feeds.has_more ?? items.length >= perPage;
+  return { items, hasMore };
 };
 
 export const getRecentPosts = async (
@@ -113,12 +103,10 @@ export const getRecentPosts = async (
     if (!response.ok) {
       return err(response.error);
     }
-    const { items, hasMore } = extractFeeds(response.value);
-    const oldest = oldestCreatedAt(items);
-    const reachedThreshold = oldest !== undefined && oldest < sinceTimestamp;
+    const { items, hasMore } = extractFeeds(response.value, req.perPage);
     return ok({
       items,
-      hasMore: hasMore && !reachedThreshold,
+      hasMore,
       totalScanned: items.length,
     });
   };

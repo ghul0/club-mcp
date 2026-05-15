@@ -106,7 +106,8 @@ export const getUserComments = async (
 
   const collected: Comment[] = [];
   let currentPage = 1;
-  let hasMore = false;
+  let upstreamHasMore = false;
+  let limitTruncatedPage = false;
 
   while (currentPage <= MAX_PAGES) {
     const response = await client.get(path, CommentsResponseSchema, {
@@ -117,13 +118,14 @@ export const getUserComments = async (
       return err(response.error);
     }
     const page = extractPage(response.value, PER_PAGE);
-    hasMore = page.hasMore;
+    upstreamHasMore = page.hasMore;
 
     for (const c of page.items) {
       if (sinceTimestamp !== undefined && !passesSince(c, sinceTimestamp)) {
         continue;
       }
       if (collected.length >= limit) {
+        limitTruncatedPage = true;
         break;
       }
       collected.push(c);
@@ -132,7 +134,7 @@ export const getUserComments = async (
     if (collected.length >= limit) {
       break;
     }
-    if (!hasMore) {
+    if (!upstreamHasMore) {
       break;
     }
     currentPage += 1;
@@ -141,6 +143,9 @@ export const getUserComments = async (
   const comments: PublicComment[] = collected.map((c) => toPublicComment(c));
   return ok({
     comments,
-    pagination: { current_page: currentPage, has_more: hasMore },
+    pagination: {
+      current_page: currentPage,
+      has_more: limitTruncatedPage || upstreamHasMore,
+    },
   });
 };

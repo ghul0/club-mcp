@@ -14,6 +14,13 @@ const AuthorSchema = z.object({
   permalink: z.string().optional(),
 });
 
+const CommentPostRefSchema = z.object({
+  id: z.coerce.number().int().positive().optional(),
+  slug: z.string().nullable().optional(),
+  title: z.string().nullable().optional(),
+  permalink: z.string().nullable().optional(),
+});
+
 export const CommentSchema = z.object({
   id: z.coerce.number().int().positive(),
   post_id: z.coerce.number().int().positive().nullable().optional(),
@@ -24,6 +31,7 @@ export const CommentSchema = z.object({
   updated_at: z.string().nullable().optional(),
   author: AuthorSchema.optional(),
   xprofile: AuthorSchema.optional(),
+  post: CommentPostRefSchema.optional(),
   reactions_count: z.coerce.number().int().nonnegative().nullable().optional(),
   status: z.string().nullable().optional(),
 });
@@ -100,6 +108,15 @@ export const toPublicComment = (
     const space = toPublicSpaceRef(f.space);
     if (space !== undefined) {
       base.space = space;
+    }
+  } else if (c.post !== undefined) {
+    const postId = c.post.id ?? c.post_id ?? undefined;
+    if (typeof postId === 'number') {
+      base.post = {
+        id: postId,
+        title: c.post.title ?? null,
+        permalink: c.post.permalink ?? null,
+      };
     }
   }
   if (options?.includeReactionsCount === true) {

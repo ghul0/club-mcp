@@ -108,7 +108,7 @@ export const getSinceSummary = async (
     if (item.created_at >= sinceTimestamp) {
       newComments.push(item);
     } else if (typeof item.updated_at === 'string' && item.updated_at >= sinceTimestamp) {
-      editedComments.push(item);
+      editedComments.push({ ...item, edit_reason: 'updated_after_since' });
     }
   }
 

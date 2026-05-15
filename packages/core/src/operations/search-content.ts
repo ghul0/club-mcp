@@ -6,6 +6,7 @@ import { err, ok } from '../result.js';
 import { validationError } from '../errors.js';
 import { parseSince } from '../date.js';
 import { concurrentMap } from '../concurrency.js';
+import { paginate, type Page, type PageRequest } from '../pagination.js';
 import {
   MembersResponseSchema,
   PublicMemberSchema,
@@ -172,25 +173,53 @@ const matchesQuery = (text: string | null | undefined, needle: string): boolean 
   return text.toLowerCase().includes(needle.toLowerCase());
 };
 
+interface CommentHit {
+  readonly feed: Feed;
+  readonly comment: Comment;
+}
+
 interface CommentScanOutcome {
-  readonly hits: ReadonlyArray<{ readonly feedId: number; readonly comment: Comment }>;
+  readonly hits: ReadonlyArray<CommentHit>;
   readonly scannedComments: number;
   readonly scannedFeeds: number;
 }
+
+const fetchFeedsForScan = async (
+  client: GetClient,
+  scanFeedLimit: number,
+): Promise<Result<ReadonlyArray<Feed>, AppError>> => {
+  const fetchFeedPage = async (
+    req: PageRequest,
+  ): Promise<Result<Page<Feed>, AppError>> => {
+    const res = await client.get('/feeds', FeedsListResponseSchema, {
+      page: req.page,
+      per_page: req.perPage,
+      order_by_type: 'new_activity',
+    });
+    if (!res.ok) {
+      return err(res.error);
+    }
+    const items = extractFeeds(res.value);
+    const hasMore = items.length >= req.perPage;
+    return ok({ items, hasMore, totalScanned: items.length });
+  };
+  return paginate<Feed>(fetchFeedPage, {
+    maxItems: scanFeedLimit,
+    perPage: UPSTREAM_PER_PAGE,
+    maxPages: 20,
+  });
+};
 
 const fetchCommentsForScope = async (
   client: GetClient,
   input: SearchContentParsed,
   sinceTimestamp: string | undefined,
 ): Promise<Result<CommentScanOutcome, AppError>> => {
-  const feedsRes = await client.get('/feeds', FeedsListResponseSchema, {
-    per_page: UPSTREAM_PER_PAGE,
-    order_by_type: 'new_activity',
-  });
+  const feedsRes = await fetchFeedsForScan(client, input.scan_feed_limit);
   if (!feedsRes.ok) {
     return err(feedsRes.error);
   }
-  const feeds = extractFeeds(feedsRes.value).slice(0, input.scan_feed_limit);
+  const feeds = feedsRes.value;
   if (feeds.length === 0) {
     return ok({ hits: [], scannedComments: 0, scannedFeeds: 0 });
   }
@@ -201,7 +230,7 @@ const fetchCommentsForScope = async (
 
   const perFeed = await concurrentMap(
     feeds,
-    async (feed): Promise<Result<ReadonlyArray<{ feedId: number; comment: Comment }>, AppError>> => {
+    async (feed): Promise<Result<ReadonlyArray<CommentHit>, AppError>> => {
       if (capReached) {
         return ok([]);
       }
@@ -220,7 +249,7 @@ const fetchCommentsForScope = async (
       if (scannedComments >= MAX_SCANNED_COMMENTS) {
         capReached = true;
       }
-      const hits: { feedId: number; comment: Comment }[] = [];
+      const hits: CommentHit[] = [];
       for (const comment of toScan) {
         if (sinceTimestamp !== undefined) {
           const createdOk = comment.created_at >= sinceTimestamp;
@@ -231,7 +260,7 @@ const fetchCommentsForScope = async (
           }
         }
         if (matchesQuery(comment.message, input.query) || matchesQuery(comment.message_rendered, input.query)) {
-          hits.push({ feedId: feed.id, comment });
+          hits.push({ feed, comment });
         }
       }
       return ok(hits);
@@ -239,7 +268,7 @@ const fetchCommentsForScope = async (
     input.concurrency,
   );
 
-  const collected: { feedId: number; comment: Comment }[] = [];
+  const collected: CommentHit[] = [];
   for (const result of perFeed) {
     if (!result.ok) {
       return err(result.error);
@@ -361,11 +390,6 @@ export const searchContent = async (
   const posts = postsResult.value.filter((p) => passesSince(p.created_at, p.updated_at, sinceTimestamp));
   const commentHits = commentsResult.value.hits;
 
-  const feedById = new Map<number, Feed>();
-  for (const p of posts) {
-    feedById.set(p.id, p);
-  }
-
   const results: SearchResult[] = [];
   let memberCount = 0;
   let postCount = 0;
@@ -399,11 +423,7 @@ export const searchContent = async (
     if (results.length >= limit) {
       break;
     }
-    const feedForComment = feedById.get(hit.feedId);
-    const publicComment: PublicComment = toPublicComment(
-      hit.comment,
-      feedForComment !== undefined ? { feed: feedForComment } : undefined,
-    );
+    const publicComment: PublicComment = toPublicComment(hit.comment, { feed: hit.feed });
     results.push({
       kind: 'comment',
       matched_field: matchedFieldForComment(hit.comment, parameters.query),

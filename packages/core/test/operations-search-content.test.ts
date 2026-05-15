@@ -311,6 +311,81 @@ describe('searchContent', () => {
     expect(result.value.scan_metadata.since).toBe('2026-01-01 00:00:00');
   });
 
+  it('paginates /feeds up to scan_feed_limit (Bucket N)', async () => {
+    const allFeeds = Array.from({ length: 250 }, (_, i) => feedFixture(i + 1, `topic ${(i + 1).toString()}`));
+    const { client, calls } = makeClient((path, query) => {
+      if (path === '/members') return { ok: true, value: { members: [] } };
+      if (path === '/feeds') {
+        const page = Number(query?.page ?? 1);
+        const perPage = Number(query?.per_page ?? 100);
+        const start = (page - 1) * perPage;
+        const slice = allFeeds.slice(start, start + perPage);
+        return { ok: true, value: { feeds: slice } };
+      }
+      if (/^\/feeds\/\d+\/comments$/.exec(path)) {
+        return { ok: true, value: { comments: [] } };
+      }
+      throw new Error(`unexpected: ${path}`);
+    });
+
+    const result = await searchContent(client, {
+      query: 'topic',
+      include_members: false,
+      include_posts: false,
+      include_comments: true,
+      scan_feed_limit: 200,
+    });
+
+    expect(isOk(result)).toBe(true);
+    if (!isOk(result)) return;
+    const feedCalls = calls.filter(([p]) => p === '/feeds');
+    expect(feedCalls.length).toBe(2);
+    for (const [, , q] of feedCalls) {
+      expect(Number(q?.per_page)).toBe(100);
+    }
+  });
+
+  it('carries feed/post context into comment hits even when include_posts=false (Bucket O)', async () => {
+    const { client } = makeClient((path) => {
+      if (path === '/feeds') {
+        return {
+          ok: true,
+          value: {
+            feeds: [
+              {
+                id: 7,
+                title: 'Source thread',
+                permalink: 'https://example.test/p/7',
+                space: { slug: 'general', title: 'General' },
+                created_at: '2025-01-01T00:00:00Z',
+              },
+            ],
+          },
+        };
+      }
+      if (path === '/feeds/7/comments') {
+        return { ok: true, value: { comments: [commentFixture(900, 'has needle inside')] } };
+      }
+      throw new Error(`unexpected: ${path}`);
+    });
+
+    const result = await searchContent(client, {
+      query: 'needle',
+      include_members: false,
+      include_posts: false,
+      include_comments: true,
+    });
+
+    expect(isOk(result)).toBe(true);
+    if (!isOk(result)) return;
+    const commentHits = result.value.results.filter((r) => r.kind === 'comment');
+    expect(commentHits).toHaveLength(1);
+    expect(commentHits[0]?.comment?.post?.id).toBe(7);
+    expect(commentHits[0]?.comment?.post?.title).toBe('Source thread');
+    expect(commentHits[0]?.comment?.post?.permalink).toBe('https://example.test/p/7');
+    expect(commentHits[0]?.comment?.space?.slug).toBe('general');
+  });
+
   it('propagates error when a scope sub-request fails', async () => {
     const { client } = makeClient((path) => {
       if (path === '/members') {

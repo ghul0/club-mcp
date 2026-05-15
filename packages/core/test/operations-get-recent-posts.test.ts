@@ -176,25 +176,24 @@ describe('getRecentPosts', () => {
     expect(result.value.since).toBe('2026-05-15 00:00:00');
   });
 
-  it('stops paginating early when the oldest item on a page is older than since', async () => {
+  it('does not early-stop on pages whose oldest created_at is older than since (new_activity sort is non-monotonic)', async () => {
     const pageOne: ReadonlyArray<Feed> = [
       makeFeed(1, '2026-05-15 11:30:00'),
       makeFeed(2, '2026-05-15 11:00:00'),
+      makeFeed(99, '2026-05-15 08:00:00'),
     ];
     const pageTwo: ReadonlyArray<Feed> = [
       makeFeed(3, '2026-05-15 10:30:00'),
-      makeFeed(4, '2026-05-15 08:00:00'),
+      makeFeed(4, '2026-05-15 10:00:00'),
     ];
     const { client, state } = makeClient((page) => {
       if (page === 1) {
         return ok({ feeds: { data: pageOne.slice(), has_more: true } });
       }
       if (page === 2) {
-        return ok({ feeds: { data: pageTwo.slice(), has_more: true } });
+        return ok({ feeds: { data: pageTwo.slice(), has_more: false } });
       }
-      return ok({
-        feeds: { data: [makeFeed(99, '2025-01-01 00:00:00')], has_more: true },
-      });
+      return ok({ feeds: { data: [], has_more: false } });
     });
 
     const result = await getRecentPosts(
@@ -205,7 +204,7 @@ describe('getRecentPosts', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
-    expect(result.value.posts.map((p) => p.id)).toEqual([1, 2, 3]);
+    expect(result.value.posts.map((p) => p.id)).toEqual([1, 2, 3, 4]);
     expect(state.calls.length).toBe(2);
   });
 

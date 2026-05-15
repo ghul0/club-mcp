@@ -426,6 +426,7 @@ describe('getSinceSummary', () => {
     expect(allIds).toEqual([4001, 4002]);
     expect(result.value.edited_comments.map((c) => c.id)).toEqual([4001]);
     expect(result.value.new_comments.map((c) => c.id)).toEqual([4002]);
+    expect(result.value.edited_comments[0]?.edit_reason).toBe('updated_after_since');
   });
 
   it('forwards include_edits=false so edited old comments are excluded', async () => {
