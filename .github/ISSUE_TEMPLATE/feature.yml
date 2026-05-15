@@ -1,0 +1,39 @@
+name: Feature proposal
+description: Suggest a non-trivial change in scope or behavior.
+title: "[feature]: <short title>"
+labels:
+  - feature
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What concrete situation motivates this feature.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The change you want.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: adrs_touched
+    attributes:
+      label: ADRs touched or new
+      description: Existing ADRs this would amend or supersede. If new architectural ground, use the ADR proposal template instead.
+  - type: dropdown
+    id: read_only_check
+    attributes:
+      label: Affects read-only invariant
+      description: ADR-006 forbids write tools. Does this proposal cross that boundary?
+      options:
+        - "No — purely read-only"
+        - "Yes — requires a new ADR"
+    validations:
+      required: true
