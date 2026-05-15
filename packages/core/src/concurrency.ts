@@ -7,10 +7,12 @@ export async function concurrentMap<T, R>(
   limit: number = DEFAULT_CONCURRENCY,
 ): Promise<ReadonlyArray<R>> {
   if (!Number.isInteger(limit) || limit < 1) {
-    throw new Error(`concurrency limit must be a positive integer, got ${limit}`);
+    throw new Error(`concurrency limit must be a positive integer, got ${String(limit)}`);
   }
   if (limit > MAX_CONCURRENCY) {
-    throw new Error(`concurrency limit ${limit} exceeds MAX_CONCURRENCY (${MAX_CONCURRENCY})`);
+    throw new Error(
+      `concurrency limit ${String(limit)} exceeds MAX_CONCURRENCY (${String(MAX_CONCURRENCY)})`,
+    );
   }
   if (items.length === 0) {
     return [];
