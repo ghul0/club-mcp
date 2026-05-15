@@ -3,9 +3,12 @@ import type { GetClient } from '../http/client.js';
 import type { AppError } from '../errors.js';
 import { validationError } from '../errors.js';
 import type { Result } from '../result.js';
-import { err } from '../result.js';
+import { err, ok } from '../result.js';
 import type { Feed } from '../schemas/feeds.js';
 import { FeedByIdResponseSchema } from '../schemas/feeds.js';
+import type { Comment } from '../schemas/comments.js';
+import { CommentsResponseSchema } from '../schemas/comments.js';
+import { paginate, type Page, type PageRequest } from '../pagination.js';
 
 export const GetFeedInputSchema = z
   .object({
@@ -16,10 +19,36 @@ export const GetFeedInputSchema = z
   .strict();
 
 export type GetFeedInput = z.input<typeof GetFeedInputSchema>;
+type ResolvedInput = z.output<typeof GetFeedInputSchema>;
 
 export interface GetFeedOutput {
   readonly feed: Feed;
+  readonly comments?: readonly Comment[];
 }
+
+const COMMENTS_PER_PAGE = 100;
+const MAX_COMMENT_PAGES = 20;
+
+const extractCommentPage = (
+  envelope: z.infer<typeof CommentsResponseSchema>,
+  perPage: number,
+): Page<Comment> => {
+  const raw = envelope.comments;
+  if (Array.isArray(raw)) {
+    return {
+      items: raw,
+      hasMore: raw.length >= perPage,
+      totalScanned: raw.length,
+    };
+  }
+  const items = raw.data;
+  const hasMore = raw.has_more ?? items.length >= perPage;
+  return {
+    items,
+    hasMore,
+    totalScanned: items.length,
+  };
+};
 
 export const getFeed = async (
   client: GetClient,
@@ -32,10 +61,40 @@ export const getFeed = async (
     return err(validationError(message));
   }
 
-  const path = `/feeds/${String(parsed.data.feed_id)}/by-id`;
-  const result = await client.get(path, FeedByIdResponseSchema);
-  if (!result.ok) {
-    return err(result.error);
+  const resolved: ResolvedInput = parsed.data;
+  const feedPath = `/feeds/${String(resolved.feed_id)}/by-id`;
+  const feedResult = await client.get(feedPath, FeedByIdResponseSchema);
+  if (!feedResult.ok) {
+    return err(feedResult.error);
   }
-  return { ok: true, value: { feed: result.value.feed } };
+
+  if (!resolved.include_comments) {
+    return ok({ feed: feedResult.value.feed });
+  }
+
+  const commentsPath = `/feeds/${String(resolved.feed_id)}/comments`;
+  const fetchPage = async (
+    req: PageRequest,
+  ): Promise<Result<Page<Comment>, AppError>> => {
+    const response = await client.get(commentsPath, CommentsResponseSchema, {
+      page: req.page,
+      per_page: req.perPage,
+    });
+    if (!response.ok) {
+      return err(response.error);
+    }
+    return ok(extractCommentPage(response.value, req.perPage));
+  };
+
+  const commentsResult = await paginate(fetchPage, {
+    maxItems: resolved.comment_limit,
+    maxPages: MAX_COMMENT_PAGES,
+    perPage: COMMENTS_PER_PAGE,
+  });
+
+  if (!commentsResult.ok) {
+    return err(commentsResult.error);
+  }
+
+  return ok({ feed: feedResult.value.feed, comments: commentsResult.value });
 };
