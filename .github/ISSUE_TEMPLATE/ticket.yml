@@ -1,0 +1,94 @@
+name: AI workflow ticket
+description: A discrete unit of work for the dual-AI implementation pipeline.
+title: "[<TICKET-ID>]: <short title>"
+labels:
+  - ticket
+body:
+  - type: input
+    id: ticket_id
+    attributes:
+      label: Ticket ID
+      description: Stable identifier, e.g. P0-04, T1-15, T2-08.
+      placeholder: T1-15
+    validations:
+      required: true
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Phase
+      options:
+        - phase-0-bootstrap
+        - phase-1-core
+        - phase-2-stdio
+        - phase-3-keyring
+        - phase-4-http
+        - phase-5-oauth
+        - phase-6-connect-flow
+        - phase-7-hosted-tools
+        - phase-8-hardening
+    validations:
+      required: true
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      options:
+        - core
+        - stdio
+        - http
+        - repo
+        - ci
+        - docs
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance criteria
+      description: Verifiable checkboxes. Each item must be testable.
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: adrs
+    attributes:
+      label: ADRs touched or referenced
+      description: ADR numbers separated by commas, e.g. ADR-004, ADR-008.
+  - type: textarea
+    id: files
+    attributes:
+      label: Files in scope
+      description: Paths the implementer is expected to create or modify.
+  - type: input
+    id: depends_on
+    attributes:
+      label: Depends on
+      description: Other ticket IDs that must merge before this one.
+  - type: dropdown
+    id: estimate
+    attributes:
+      label: Estimate (AI dev-days)
+      options:
+        - 0.1d
+        - 0.25d
+        - 0.5d
+        - 0.75d
+        - 1d
+        - 1.5d
+        - 2d
+        - 3d+
+    validations:
+      required: true
+  - type: dropdown
+    id: owner_role
+    attributes:
+      label: Owner role
+      options:
+        - Architect
+        - Planner
+        - Implementer
+        - Operator (human)
+    validations:
+      required: true

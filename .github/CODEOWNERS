@@ -1,0 +1,7 @@
+# Until rev-a-bot, rev-b-bot, architect-bot GitHub Apps exist (P0-18),
+# @ghul0 is the placeholder owner. Replace after bots are installed.
+
+/packages/**           @ghul0
+/docs/adr/**           @ghul0
+/.github/workflows/**  @ghul0
+/scripts/**            @ghul0

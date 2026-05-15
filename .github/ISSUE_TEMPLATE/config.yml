@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security disclosure
+    url: https://github.com/ghul0/club-mcp/blob/main/SECURITY.md
+    about: Report a security vulnerability privately, not via Issues.
+  - name: Agent workflow
+    url: https://github.com/ghul0/club-mcp/blob/main/docs/agent-workflow.md
+    about: How AI agents pick, implement, review, and merge tickets.
+  - name: Architecture decisions
+    url: https://github.com/ghul0/club-mcp/tree/main/docs/adr
+    about: Existing ADRs. Propose a new one via the ADR proposal template.

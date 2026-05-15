@@ -1,0 +1,50 @@
+name: ADR proposal
+description: Propose a new architectural decision record.
+title: "[ADR-NNN]: <decision title>"
+labels:
+  - adr
+  - architecture
+body:
+  - type: input
+    id: number
+    attributes:
+      label: Proposed ADR number
+      description: Next available `NNN` after the highest existing one in docs/adr/.
+      placeholder: "018"
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Situation, constraints, and why we are deciding now.
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Decision
+      description: One unambiguous choice. No optional clauses.
+    validations:
+      required: true
+  - type: textarea
+    id: consequences
+    attributes:
+      label: Consequences
+      description: Trade-offs accepted and concrete downstream changes.
+    validations:
+      required: true
+  - type: dropdown
+    id: supersedes
+    attributes:
+      label: Supersedes existing ADR
+      options:
+        - "No"
+        - "Yes (link in description)"
+    validations:
+      required: true
+  - type: input
+    id: references
+    attributes:
+      label: References
+      description: Related ADRs, specs, research notes.
