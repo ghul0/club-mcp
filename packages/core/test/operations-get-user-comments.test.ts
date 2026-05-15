@@ -158,6 +158,68 @@ describe('getUserComments', () => {
     expect(result.value.comments.map((c) => c.id)).toEqual([1, 2, 3, 4, 5]);
   });
 
+  it('filters comments by since timestamp when provided (Bucket A1)', async () => {
+    const NOW = new Date(Date.UTC(2026, 4, 15, 12, 0, 0));
+    const client = buildClient(() =>
+      ok({
+        comments: [
+          makeComment(1, { created_at: '2025-01-01 00:00:00' }),
+          makeComment(2, { created_at: '2026-06-01 12:00:00' }),
+        ],
+      }),
+    );
+
+    const result = await getUserComments(
+      client,
+      { username: 'thomas', since: '2026-01-01' },
+      NOW,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value.comments.map((c) => c.id)).toEqual([2]);
+  });
+
+  it('includes edited old comments when updated_at >= since (Bucket A1)', async () => {
+    const NOW = new Date(Date.UTC(2026, 4, 15, 12, 0, 0));
+    const client = buildClient(() =>
+      ok({
+        comments: [
+          {
+            id: 99,
+            created_at: '2025-01-01 00:00:00',
+            updated_at: '2026-06-01 12:00:00',
+            message: 'edited late',
+          },
+        ],
+      }),
+    );
+
+    const result = await getUserComments(
+      client,
+      { username: 'thomas', since: '2026-01-01' },
+      NOW,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value.comments).toHaveLength(1);
+    expect(result.value.comments[0]?.id).toBe(99);
+  });
+
+  it('returns a validation error when since is unparseable (Bucket A1)', async () => {
+    const client = buildClient(() => ok({ comments: [] }));
+
+    const result = await getUserComments(client, {
+      username: 'thomas',
+      since: 'not-a-date',
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected err');
+    expect(result.error.code).toBe('validation');
+  });
+
   it('propagates an upstream 404 from the underlying client', async () => {
     const failure = upstreamNotFound('profile not found');
     const client = buildClient(() => err(failure));

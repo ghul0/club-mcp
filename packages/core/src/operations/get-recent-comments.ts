@@ -8,7 +8,20 @@ import { parseSince } from '../date.js';
 import { paginate, type Page, type PageRequest } from '../pagination.js';
 import { concurrentMap } from '../concurrency.js';
 import { FeedsListResponseSchema, type Feed } from '../schemas/feeds.js';
-import { CommentsResponseSchema, type Comment } from '../schemas/comments.js';
+import { CommentsResponseSchema, CommentSchema, type Comment } from '../schemas/comments.js';
+
+export const RecentCommentItemSchema = z.object({
+  feed: z.object({
+    id: z.coerce.number().int().positive(),
+    title: z.string().nullable().optional(),
+  }),
+  comment: CommentSchema,
+});
+
+export const GetRecentCommentsOutputSchema = z.object({
+  comments: z.array(RecentCommentItemSchema),
+  since: z.string(),
+});
 
 export const GetRecentCommentsInputSchema = z
   .object({

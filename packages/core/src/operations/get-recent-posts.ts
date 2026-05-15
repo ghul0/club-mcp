@@ -6,7 +6,12 @@ import type { AppError } from '../errors.js';
 import { parseSince } from '../date.js';
 import { paginate } from '../pagination.js';
 import type { Feed } from '../schemas/feeds.js';
-import { FeedsListResponseSchema } from '../schemas/feeds.js';
+import { FeedsListResponseSchema, FeedSchema } from '../schemas/feeds.js';
+
+export const GetRecentPostsOutputSchema = z.object({
+  posts: z.array(FeedSchema),
+  since: z.string(),
+});
 
 const SPACE_PATTERN = /^[A-Za-z0-9_-]{1,120}$/;
 
@@ -77,7 +82,7 @@ export const getRecentPosts = async (
   if (!validated.ok) {
     return err(validated.error);
   }
-  const { since: rawSince, limit, scan_feed_limit } = validated.value;
+  const { since: rawSince, space, limit, scan_feed_limit } = validated.value;
 
   const sinceResult = parseSince(rawSince, now);
   if (!sinceResult.ok) {
@@ -91,10 +96,16 @@ export const getRecentPosts = async (
   }): Promise<
     Result<{ readonly items: ReadonlyArray<Feed>; readonly hasMore: boolean; readonly totalScanned: number }, AppError>
   > => {
-    const response = await client.get(FEEDS_PATH, FeedsListResponseSchema, {
+    const query: Record<string, string | number | boolean | undefined> = {
+      feed_base_url: 'feeds',
       page: req.page,
       per_page: req.perPage,
-    });
+      order_by_type: 'new_activity',
+    };
+    if (space !== undefined) {
+      query.space = space;
+    }
+    const response = await client.get(FEEDS_PATH, FeedsListResponseSchema, query);
     if (!response.ok) {
       return err(response.error);
     }

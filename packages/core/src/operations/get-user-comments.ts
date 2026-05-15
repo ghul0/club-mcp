@@ -6,8 +6,13 @@ import type { AppError } from '../errors.js';
 import { validationError } from '../errors.js';
 import type { Page, PageRequest } from '../pagination.js';
 import { paginate } from '../pagination.js';
+import { parseSince } from '../date.js';
 import type { Comment } from '../schemas/comments.js';
-import { CommentsResponseSchema } from '../schemas/comments.js';
+import { CommentsResponseSchema, CommentSchema } from '../schemas/comments.js';
+
+export const GetUserCommentsOutputSchema = z.object({
+  comments: z.array(CommentSchema),
+});
 
 const USERNAME_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
 
@@ -63,6 +68,7 @@ const extractPage = (
 export const getUserComments = async (
   client: GetClient,
   input: GetUserCommentsInput,
+  now?: Date,
 ): Promise<Result<GetUserCommentsOutput, AppError>> => {
   const parsed = GetUserCommentsInputSchema.safeParse(input);
   if (!parsed.success) {
@@ -71,7 +77,17 @@ export const getUserComments = async (
     return err(validationError(message));
   }
 
-  const { username, limit } = parsed.data;
+  const { username, since: rawSince, limit } = parsed.data;
+
+  let sinceTimestamp: string | undefined;
+  if (rawSince !== undefined) {
+    const sinceResult = parseSince(rawSince, now);
+    if (!sinceResult.ok) {
+      return err(sinceResult.error);
+    }
+    sinceTimestamp = sinceResult.value;
+  }
+
   const path = `/profile/${encodeURIComponent(username)}/comments`;
 
   const fetchPage = async (
@@ -97,5 +113,20 @@ export const getUserComments = async (
     return err(result.error);
   }
 
-  return ok({ comments: result.value });
+  const all = result.value;
+  if (sinceTimestamp === undefined) {
+    return ok({ comments: all });
+  }
+
+  const threshold = sinceTimestamp;
+  const filtered = all.filter((c) => {
+    if (c.created_at >= threshold) {
+      return true;
+    }
+    if (typeof c.updated_at === 'string' && c.updated_at >= threshold) {
+      return true;
+    }
+    return false;
+  });
+  return ok({ comments: filtered });
 };

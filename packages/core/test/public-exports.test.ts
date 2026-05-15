@@ -86,6 +86,25 @@ const INPUT_SCHEMAS: readonly string[] = [
   'GetSinceSummaryInputSchema',
 ];
 
+const OUTPUT_SCHEMAS: readonly string[] = [
+  'SearchMembersOutputSchema',
+  'GetFeedOutputSchema',
+  'GetFeedCommentsOutputSchema',
+  'GetRecentPostsOutputSchema',
+  'GetRecentCommentsOutputSchema',
+  'RecentCommentItemSchema',
+  'SearchContentOutputSchema',
+  'SearchResultSchema',
+  'SearchScanMetadataSchema',
+  'GetProfileOutputSchema',
+  'GetMyProfileOutputSchema',
+  'ListSpacesOutputSchema',
+  'ListCoursesOutputSchema',
+  'GetUnreadNotificationsOutputSchema',
+  'GetUserCommentsOutputSchema',
+  'GetSinceSummaryOutputSchema',
+];
+
 const CONSTANTS: readonly string[] = [
   'packageName',
   'DEFAULT_CONCURRENCY',
@@ -98,6 +117,7 @@ const EXPECTED_RUNTIME_EXPORTS: ReadonlyArray<string> = [
   ...OPERATIONS,
   ...SCHEMAS,
   ...INPUT_SCHEMAS,
+  ...OUTPUT_SCHEMAS,
   ...CONSTANTS,
 ];
 

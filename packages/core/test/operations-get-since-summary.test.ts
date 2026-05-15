@@ -157,11 +157,14 @@ describe('getSinceSummary', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
-    expect(result.value.since).toBe('2024-06-15 00:00:00');
-    expect(result.value.posts.map((p) => p.id).sort((a, b) => a - b)).toEqual([101, 102]);
-    expect(result.value.comments).toHaveLength(3);
-    const commentIds = result.value.comments.map((c) => c.comment.id).sort((a, b) => a - b);
+    expect(result.value.scan_metadata.since).toBe('2024-06-15 00:00:00');
+    expect(result.value.new_posts.map((p) => p.id).sort((a, b) => a - b)).toEqual([101, 102]);
+    expect(result.value.new_comments).toHaveLength(3);
+    const commentIds = result.value.new_comments.map((c) => c.comment.id).sort((a, b) => a - b);
     expect(commentIds).toEqual([9001, 9002, 9003]);
+    expect(result.value.counts.new_posts).toBe(2);
+    expect(result.value.counts.new_comments).toBe(3);
+    expect(result.value.counts.edited_comments).toBe(0);
   });
 
   it('returns ok with empty arrays when no recent activity exists', async () => {
@@ -183,9 +186,10 @@ describe('getSinceSummary', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
-    expect(result.value.since).toBe('2024-06-15 00:00:00');
-    expect(result.value.posts).toEqual([]);
-    expect(result.value.comments).toEqual([]);
+    expect(result.value.scan_metadata.since).toBe('2024-06-15 00:00:00');
+    expect(result.value.new_posts).toEqual([]);
+    expect(result.value.new_comments).toEqual([]);
+    expect(result.value.edited_comments).toEqual([]);
   });
 
   it('rejects an invalid since string with a validation error and makes no client calls', async () => {
@@ -318,8 +322,8 @@ describe('getSinceSummary', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
-    expect(result.value.posts).toHaveLength(2);
-    expect(result.value.comments.length).toBeGreaterThanOrEqual(2);
+    expect(result.value.new_posts).toHaveLength(2);
+    expect(result.value.new_comments.length).toBeGreaterThanOrEqual(2);
   });
 
   it('respects maxCommentsPerPost cap', async () => {
@@ -359,7 +363,7 @@ describe('getSinceSummary', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
-    expect(result.value.comments).toHaveLength(2);
+    expect(result.value.new_comments).toHaveLength(2);
   });
 
   it('applies defaults for maxPosts, maxCommentsPerPost, and concurrency when omitted', async () => {
@@ -379,8 +383,8 @@ describe('getSinceSummary', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
-    expect(result.value.posts).toHaveLength(1);
-    expect(result.value.comments).toHaveLength(1);
+    expect(result.value.new_posts).toHaveLength(1);
+    expect(result.value.new_comments).toHaveLength(1);
   });
 
   it('forwards include_edits=true so edited old comments are included in comments slice', async () => {
@@ -415,8 +419,13 @@ describe('getSinceSummary', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
-    const ids = result.value.comments.map((c) => c.comment.id).sort((a, b) => a - b);
-    expect(ids).toEqual([4001, 4002]);
+    const allIds = [
+      ...result.value.new_comments.map((c) => c.comment.id),
+      ...result.value.edited_comments.map((c) => c.comment.id),
+    ].sort((a, b) => a - b);
+    expect(allIds).toEqual([4001, 4002]);
+    expect(result.value.edited_comments.map((c) => c.comment.id)).toEqual([4001]);
+    expect(result.value.new_comments.map((c) => c.comment.id)).toEqual([4002]);
   });
 
   it('forwards include_edits=false so edited old comments are excluded', async () => {
@@ -451,7 +460,8 @@ describe('getSinceSummary', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
-    expect(result.value.comments).toHaveLength(1);
-    expect(result.value.comments[0]?.comment.id).toBe(5002);
+    expect(result.value.new_comments).toHaveLength(1);
+    expect(result.value.new_comments[0]?.comment.id).toBe(5002);
+    expect(result.value.edited_comments).toHaveLength(0);
   });
 });

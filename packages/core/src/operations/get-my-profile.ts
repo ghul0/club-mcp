@@ -4,20 +4,41 @@ import type { Result } from '../result.js';
 import { err, ok } from '../result.js';
 import type { AppError } from '../errors.js';
 import { validationError } from '../errors.js';
+import { redactKeys } from '../redaction.js';
 import {
   ProfileResponseSchema,
   ProfileSpacesResponseSchema,
+  ProfileSchema,
   type Profile,
   type ProfileSpace,
 } from '../schemas/profile.js';
 
+const ProfileSpaceOutSchema = z.object({
+  id: z.coerce.number().int().positive().optional(),
+  slug: z.string(),
+  title: z.string().nullable().optional(),
+  privacy: z.string().nullable().optional(),
+});
+
+export const GetMyProfileOutputSchema = z.object({
+  profile: ProfileSchema,
+  spaces: z.array(ProfileSpaceOutSchema).optional(),
+});
+
+const PRIVATE_FIELD_KEYS: ReadonlyArray<string> = [
+  'email',
+  'user_email',
+  'email_address',
+  'phone',
+  'phone_number',
+  'mobile',
+  'address',
+  'ip_address',
+  'last_login_ip',
+];
+
 export const GetMyProfileInputSchema = z
   .object({
-    consent: z.literal(true, {
-      errorMap: () => ({
-        message: 'consent must be explicitly true to fetch own profile (privacy gate)',
-      }),
-    }),
     include_private_fields: z.boolean().optional().default(false),
     include_spaces: z.boolean().optional().default(true),
   })
@@ -53,11 +74,14 @@ const extractSpaces = (
   return spaces.data;
 };
 
+const redactPrivateFields = (profile: Profile): Profile =>
+  redactKeys(profile, { blocklistKeys: PRIVATE_FIELD_KEYS });
+
 export const getMyProfile = async (
   client: GetClient,
-  input: GetMyProfileInput,
+  input?: GetMyProfileInput,
 ): Promise<Result<GetMyProfileOutput, AppError>> => {
-  const parsed = GetMyProfileInputSchema.safeParse(input);
+  const parsed = GetMyProfileInputSchema.safeParse(input ?? {});
   if (!parsed.success) {
     return err(validationError(formatIssues(parsed.error)));
   }
@@ -67,9 +91,12 @@ export const getMyProfile = async (
   if (!profileResponse.ok) {
     return err(profileResponse.error);
   }
+  const profile = resolved.include_private_fields
+    ? profileResponse.value.profile
+    : redactPrivateFields(profileResponse.value.profile);
 
   if (!resolved.include_spaces) {
-    return ok({ profile: profileResponse.value.profile });
+    return ok({ profile });
   }
 
   const spacesResponse = await client.get(ME_SPACES_PATH, ProfileSpacesResponseSchema);
@@ -78,7 +105,7 @@ export const getMyProfile = async (
   }
 
   return ok({
-    profile: profileResponse.value.profile,
+    profile,
     spaces: extractSpaces(spacesResponse.value),
   });
 };

@@ -209,6 +209,38 @@ describe('getRecentPosts', () => {
     expect(state.calls.length).toBe(2);
   });
 
+  it('passes feed_base_url, order_by_type, and space query params (Bucket A2)', async () => {
+    const { client, state } = makeClient(() =>
+      ok({ feeds: { data: [], has_more: false } }),
+    );
+
+    await getRecentPosts(
+      client,
+      { since: '2026-05-15 00:00:00', space: 'dyskusje' },
+      NOW,
+    );
+
+    expect(state.calls.length).toBeGreaterThan(0);
+    const query = state.calls[0]?.query;
+    expect(query?.feed_base_url).toBe('feeds');
+    expect(query?.order_by_type).toBe('new_activity');
+    expect(query?.space).toBe('dyskusje');
+  });
+
+  it('omits the space query param when space is not provided (Bucket A2)', async () => {
+    const { client, state } = makeClient(() =>
+      ok({ feeds: { data: [], has_more: false } }),
+    );
+
+    await getRecentPosts(client, { since: '2026-05-15 00:00:00' }, NOW);
+
+    expect(state.calls.length).toBeGreaterThan(0);
+    const query = state.calls[0]?.query;
+    expect(query?.feed_base_url).toBe('feeds');
+    expect(query?.order_by_type).toBe('new_activity');
+    expect(query?.space).toBeUndefined();
+  });
+
   it('forwards upstream errors from the client', async () => {
     const failure = externalService('boom');
     const { client } = makeClient(() => err(failure));

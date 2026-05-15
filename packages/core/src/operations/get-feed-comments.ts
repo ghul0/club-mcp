@@ -7,7 +7,11 @@ import { validationError } from '../errors.js';
 import type { Page, PageRequest } from '../pagination.js';
 import { paginate } from '../pagination.js';
 import type { Comment } from '../schemas/comments.js';
-import { CommentsResponseSchema } from '../schemas/comments.js';
+import { CommentsResponseSchema, CommentSchema } from '../schemas/comments.js';
+
+export const GetFeedCommentsOutputSchema = z.object({
+  comments: z.array(CommentSchema),
+});
 
 export const GetFeedCommentsInputSchema = z
   .object({

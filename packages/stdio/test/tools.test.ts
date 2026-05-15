@@ -104,4 +104,22 @@ describe('callTool', () => {
     const structured = result.structuredContent as { error: { code: string } };
     expect(structured.error.code).toBe('validation');
   });
+
+  it('validates output shape on success (Bucket C defense in depth)', async () => {
+    const { client } = buildMockClient({
+      '/members': { members: [{ user_id: 1, username: 'thomas', display_name: 'Thomas' }] },
+    });
+    const result = await callTool({ client }, 'club_search_members', { query: 'thomas' });
+    expect(result.isError).toBeUndefined();
+    const structured = result.structuredContent as { result: { members: unknown[] } };
+    expect(structured.result.members).toHaveLength(1);
+  });
+
+  it('returns external_service error when output is structurally broken (defense in depth)', async () => {
+    const { client } = buildMockClient({
+      '/notifications/unread': { notifications: [{ id: 'not-a-number', created_at: '2026-05-15' }] },
+    });
+    const result = await callTool({ client }, 'club_get_unread_notifications', {});
+    expect(result.isError).toBe(true);
+  });
 });

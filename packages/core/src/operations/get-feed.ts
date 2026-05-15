@@ -5,9 +5,14 @@ import { validationError } from '../errors.js';
 import type { Result } from '../result.js';
 import { err, ok } from '../result.js';
 import type { Feed } from '../schemas/feeds.js';
-import { FeedByIdResponseSchema } from '../schemas/feeds.js';
+import { FeedByIdResponseSchema, FeedSchema } from '../schemas/feeds.js';
 import type { Comment } from '../schemas/comments.js';
-import { CommentsResponseSchema } from '../schemas/comments.js';
+import { CommentsResponseSchema, CommentSchema } from '../schemas/comments.js';
+
+export const GetFeedOutputSchema = z.object({
+  feed: FeedSchema,
+  comments: z.array(CommentSchema).optional(),
+});
 import { paginate, type Page, type PageRequest } from '../pagination.js';
 
 export const GetFeedInputSchema = z

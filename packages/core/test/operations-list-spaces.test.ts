@@ -155,6 +155,74 @@ describe('listSpaces', () => {
     expect(result.error).toBe(upstreamErr);
   });
 
+  it('fans out to /spaces/{slug}/members when include_members=true (Bucket A4)', async () => {
+    const calls: { path: string; query?: Record<string, string | number | boolean | undefined> }[] = [];
+    const getMock = vi.fn(
+      async (
+        path: string,
+        _schema: unknown,
+        query?: Record<string, string | number | boolean | undefined>,
+      ) => {
+        calls.push({ path, query });
+        if (path === '/spaces/all-spaces') {
+          return ok({
+            spaces: [
+              { id: 1, slug: 'general', title: 'General' },
+              { id: 2, slug: 'random', title: 'Random' },
+            ],
+          });
+        }
+        if (path === '/spaces/general/members') {
+          return ok({
+            members: [{ user_id: 1, display_name: 'Alice', username: 'alice' }],
+          });
+        }
+        if (path === '/spaces/random/members') {
+          return ok({
+            members: [
+              { user_id: 2, display_name: 'Bob', username: 'bob' },
+              { user_id: 3, display_name: 'Carol', username: 'carol' },
+            ],
+          });
+        }
+        throw new Error(`unexpected ${path}`);
+      },
+    );
+    const client: GetClient = { get: getMock as unknown as GetClient['get'] };
+
+    const result = await listSpaces(client, { include_members: true, member_limit: 25 });
+
+    expect(isOk(result)).toBe(true);
+    if (!isOk(result)) return;
+    expect(result.value.spaces).toHaveLength(2);
+    const general = result.value.spaces.find((s) => s.slug === 'general');
+    const random = result.value.spaces.find((s) => s.slug === 'random');
+    expect(general?.members).toHaveLength(1);
+    expect(random?.members).toHaveLength(2);
+    const memberCalls = calls.filter((c) => c.path.endsWith('/members'));
+    expect(memberCalls).toHaveLength(2);
+    expect(memberCalls[0]?.query?.per_page).toBe(25);
+  });
+
+  it('does NOT fetch members when include_members=false (Bucket A4)', async () => {
+    const getMock = vi.fn(
+      async (path: string) => {
+        if (path === '/spaces/all-spaces') {
+          return ok({ spaces: [{ id: 1, slug: 'general', title: 'General' }] });
+        }
+        throw new Error(`unexpected ${path}`);
+      },
+    );
+    const client: GetClient = { get: getMock as unknown as GetClient['get'] };
+
+    const result = await listSpaces(client, { include_members: false });
+
+    expect(isOk(result)).toBe(true);
+    if (!isOk(result)) return;
+    expect(result.value.spaces[0]?.members).toBeUndefined();
+    expect(getMock).toHaveBeenCalledTimes(1);
+  });
+
   it('does not call client when input is invalid', async () => {
     const getMock = vi.fn(() =>
       Promise.resolve(ok({ spaces: [] as Array<{ slug: string }> })),

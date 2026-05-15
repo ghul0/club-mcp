@@ -4,8 +4,31 @@ import type { Result } from '../result.js';
 import type { AppError } from '../errors.js';
 import { err, ok } from '../result.js';
 import { validationError } from '../errors.js';
+import { parseSince } from '../date.js';
+import { FeedSchema } from '../schemas/feeds.js';
 import { getRecentPosts, type GetRecentPostsOutput } from './get-recent-posts.js';
-import { getRecentComments, type GetRecentCommentsOutput } from './get-recent-comments.js';
+import {
+  getRecentComments,
+  RecentCommentItemSchema,
+  type RecentCommentItem,
+} from './get-recent-comments.js';
+
+export const GetSinceSummaryOutputSchema = z.object({
+  new_posts: z.array(FeedSchema),
+  new_comments: z.array(RecentCommentItemSchema),
+  edited_comments: z.array(RecentCommentItemSchema),
+  counts: z.object({
+    new_posts: z.number().int().nonnegative(),
+    new_comments: z.number().int().nonnegative(),
+    edited_comments: z.number().int().nonnegative(),
+  }),
+  scan_metadata: z.object({
+    scanned_feeds: z.number().int().nonnegative(),
+    scanned_comments: z.number().int().nonnegative(),
+    since: z.string(),
+    generated_at: z.string(),
+  }),
+});
 
 export const GetSinceSummaryInputSchema = z
   .object({
@@ -20,9 +43,20 @@ export type GetSinceSummaryInput = z.input<typeof GetSinceSummaryInputSchema>;
 type ResolvedInput = z.output<typeof GetSinceSummaryInputSchema>;
 
 export type GetSinceSummaryOutput = {
-  readonly since: string;
-  readonly posts: GetRecentPostsOutput['posts'];
-  readonly comments: GetRecentCommentsOutput['comments'];
+  readonly new_posts: GetRecentPostsOutput['posts'];
+  readonly new_comments: readonly RecentCommentItem[];
+  readonly edited_comments: readonly RecentCommentItem[];
+  readonly counts: {
+    readonly new_posts: number;
+    readonly new_comments: number;
+    readonly edited_comments: number;
+  };
+  readonly scan_metadata: {
+    readonly scanned_feeds: number;
+    readonly scanned_comments: number;
+    readonly since: string;
+    readonly generated_at: string;
+  };
 };
 
 const formatZodIssues = (error: z.ZodError): string => {
@@ -45,6 +79,12 @@ export const getSinceSummary = async (
   }
   const resolved: ResolvedInput = parsed.data;
 
+  const sinceResult = parseSince(resolved.since, now);
+  if (!sinceResult.ok) {
+    return err(sinceResult.error);
+  }
+  const sinceTimestamp = sinceResult.value;
+
   const [postsResult, commentsResult] = await Promise.all([
     getRecentPosts(client, { since: resolved.since, limit: resolved.limit_posts }, now),
     getRecentComments(
@@ -65,9 +105,35 @@ export const getSinceSummary = async (
     return err(commentsResult.error);
   }
 
+  const newComments: RecentCommentItem[] = [];
+  const editedComments: RecentCommentItem[] = [];
+  for (const item of commentsResult.value.comments) {
+    if (item.comment.created_at >= sinceTimestamp) {
+      newComments.push(item);
+    } else if (
+      typeof item.comment.updated_at === 'string' &&
+      item.comment.updated_at >= sinceTimestamp
+    ) {
+      editedComments.push(item);
+    }
+  }
+
+  const generatedAt = (now ?? new Date()).toISOString();
+
   return ok({
-    since: postsResult.value.since,
-    posts: postsResult.value.posts,
-    comments: commentsResult.value.comments,
+    new_posts: postsResult.value.posts,
+    new_comments: newComments,
+    edited_comments: editedComments,
+    counts: {
+      new_posts: postsResult.value.posts.length,
+      new_comments: newComments.length,
+      edited_comments: editedComments.length,
+    },
+    scan_metadata: {
+      scanned_feeds: 0,
+      scanned_comments: commentsResult.value.comments.length,
+      since: sinceTimestamp,
+      generated_at: generatedAt,
+    },
   });
 };

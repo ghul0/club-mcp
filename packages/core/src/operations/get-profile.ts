@@ -8,10 +8,24 @@ import {
   ProfileResponseSchema,
   ProfileSpacesResponseSchema,
   ProfileCommentsResponseSchema,
+  ProfileSchema,
   type Profile,
   type ProfileSpace,
 } from '../schemas/profile.js';
-import type { Comment } from '../schemas/comments.js';
+import { CommentSchema, type Comment } from '../schemas/comments.js';
+
+const ProfileSpaceOutSchema = z.object({
+  id: z.coerce.number().int().positive().optional(),
+  slug: z.string(),
+  title: z.string().nullable().optional(),
+  privacy: z.string().nullable().optional(),
+});
+
+export const GetProfileOutputSchema = z.object({
+  profile: ProfileSchema,
+  spaces: z.array(ProfileSpaceOutSchema).optional(),
+  recent_comments: z.array(CommentSchema).optional(),
+});
 
 const USERNAME_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
 

@@ -6,14 +6,21 @@ import type { AppError } from '../errors.js';
 import { validationError } from '../errors.js';
 import {
   UnreadNotificationsResponseSchema,
+  NotificationItemSchema,
   type NotificationItem,
 } from '../schemas/notifications.js';
+
+export const GetUnreadNotificationsOutputSchema = z.object({
+  unread_count: z.number().int().nonnegative(),
+  notifications: z.array(NotificationItemSchema),
+});
 
 export const GetUnreadNotificationsInputSchema = z.object({}).strict();
 
 export type GetUnreadNotificationsInput = z.input<typeof GetUnreadNotificationsInputSchema>;
 
 export interface GetUnreadNotificationsOutput {
+  readonly unread_count: number;
   readonly notifications: readonly NotificationItem[];
 }
 
@@ -53,5 +60,8 @@ export const getUnreadNotifications = async (
     return err(response.error);
   }
 
-  return ok({ notifications: extractNotifications(response.value) });
+  const notifications = extractNotifications(response.value);
+  const reported = response.value.unread_count;
+  const unread_count = typeof reported === 'number' ? reported : notifications.length;
+  return ok({ unread_count, notifications });
 };

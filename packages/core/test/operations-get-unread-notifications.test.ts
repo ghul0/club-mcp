@@ -125,6 +125,41 @@ describe('getUnreadNotifications', () => {
     expect(result.value.notifications).toEqual([]);
   });
 
+  it('returns unread_count from upstream when provided (Bucket B7)', async () => {
+    const client = makeClient(() =>
+      Promise.resolve(
+        ok({
+          unread_count: 5,
+          notifications: [baseNotification],
+        }),
+      ),
+    );
+
+    const result = await getUnreadNotifications(client);
+
+    expect(isOk(result)).toBe(true);
+    if (!isOk(result)) return;
+    expect(result.value.unread_count).toBe(5);
+    expect(result.value.notifications).toHaveLength(1);
+  });
+
+  it('falls back to notifications.length for unread_count when upstream omits it (Bucket B7)', async () => {
+    const client = makeClient(() =>
+      Promise.resolve(
+        ok({
+          notifications: [baseNotification, { ...baseNotification, id: 502 }],
+        }),
+      ),
+    );
+
+    const result = await getUnreadNotifications(client);
+
+    expect(isOk(result)).toBe(true);
+    if (!isOk(result)) return;
+    expect(result.value.unread_count).toBe(2);
+    expect(result.value.notifications).toHaveLength(2);
+  });
+
   it('propagates upstream 401 unauthorized errors unchanged', async () => {
     const upstreamErr = upstreamUnauthorized('upstream returned 401');
     const client = makeClient(() => Promise.resolve(err(upstreamErr)));

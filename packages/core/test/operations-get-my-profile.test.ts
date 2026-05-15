@@ -21,12 +21,12 @@ const makeClient = (
 };
 
 describe('getMyProfile', () => {
-  it('returns ok({ profile }) on happy path when consent=true and include_spaces=false', async () => {
+  it('returns ok({ profile }) on happy path when include_spaces=false (defaults: include_private_fields=false)', async () => {
     const { client, spy } = makeClient(() =>
       Promise.resolve(ok({ profile: sampleProfile })),
     );
 
-    const result = await getMyProfile(client, { consent: true, include_spaces: false });
+    const result = await getMyProfile(client, { include_spaces: false });
 
     expect(isOk(result)).toBe(true);
     if (!isOk(result)) return;
@@ -54,7 +54,7 @@ describe('getMyProfile', () => {
     });
     const client: GetClient = { get: spy as unknown as GetClient['get'] };
 
-    const result = await getMyProfile(client, { consent: true });
+    const result = await getMyProfile(client);
 
     expect(isOk(result)).toBe(true);
     if (!isOk(result)) return;
@@ -72,7 +72,7 @@ describe('getMyProfile', () => {
     });
     const client: GetClient = { get: spy as unknown as GetClient['get'] };
 
-    const result = await getMyProfile(client, { consent: true, include_spaces: false });
+    const result = await getMyProfile(client, { include_spaces: false });
 
     expect(isOk(result)).toBe(true);
     if (!isOk(result)) return;
@@ -80,41 +80,60 @@ describe('getMyProfile', () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
-  it('returns validation error and does not call client when consent is false', async () => {
-    const { client, spy } = makeClient(() => {
-      throw new Error('client must not be called');
+  it('accepts an omitted input and applies defaults (include_spaces=true)', async () => {
+    const spy = vi.fn(async (path: string): Promise<Result<unknown, AppError>> => {
+      if (path === '/profile/me/spaces') {
+        return ok({ spaces: [] });
+      }
+      return ok({ profile: sampleProfile });
     });
+    const client: GetClient = { get: spy as unknown as GetClient['get'] };
 
-    const result = await getMyProfile(client, { consent: false } as unknown as GetMyProfileInput);
+    const result = await getMyProfile(client);
 
-    expect(isErr(result)).toBe(true);
-    if (!isErr(result)) return;
-    expect(result.error.code).toBe('validation');
-    expect(result.error.retryable).toBe(false);
-    expect(spy).not.toHaveBeenCalled();
+    expect(isOk(result)).toBe(true);
+    expect(spy).toHaveBeenCalledTimes(2);
   });
 
-  it('returns validation error and does not call client when consent is missing', async () => {
-    const { client, spy } = makeClient(() => {
-      throw new Error('client must not be called');
-    });
+  it('redacts private fields by default (include_private_fields=false)', async () => {
+    const profileWithEmail = { ...sampleProfile, email: 'thomas@example.com' } as Record<string, unknown>;
+    const { client } = makeClient(() =>
+      Promise.resolve(ok({ profile: profileWithEmail })),
+    );
 
-    const result = await getMyProfile(client, {} as unknown as GetMyProfileInput);
+    const result = await getMyProfile(client, { include_spaces: false });
 
-    expect(isErr(result)).toBe(true);
-    if (!isErr(result)) return;
-    expect(result.error.code).toBe('validation');
-    expect(spy).not.toHaveBeenCalled();
+    expect(isOk(result)).toBe(true);
+    if (!isOk(result)) return;
+    const profile = result.value.profile as unknown as Record<string, unknown>;
+    expect(profile.email).toBe('[REDACTED]');
   });
 
-  it('returns validation error when consent is not a boolean true literal', async () => {
+  it('preserves email when include_private_fields=true', async () => {
+    const profileWithEmail = { ...sampleProfile, email: 'thomas@example.com' } as Record<string, unknown>;
+    const { client } = makeClient(() =>
+      Promise.resolve(ok({ profile: profileWithEmail })),
+    );
+
+    const result = await getMyProfile(client, {
+      include_spaces: false,
+      include_private_fields: true,
+    });
+
+    expect(isOk(result)).toBe(true);
+    if (!isOk(result)) return;
+    const profile = result.value.profile as unknown as Record<string, unknown>;
+    expect(profile.email).toBe('thomas@example.com');
+  });
+
+  it('rejects unknown keys via strict schema (e.g. legacy consent key)', async () => {
     const { client, spy } = makeClient(() => {
       throw new Error('client must not be called');
     });
 
     const result = await getMyProfile(
       client,
-      { consent: 'yes' } as unknown as GetMyProfileInput,
+      { consent: true } as unknown as GetMyProfileInput,
     );
 
     expect(isErr(result)).toBe(true);
@@ -127,7 +146,7 @@ describe('getMyProfile', () => {
     const upstream = upstreamUnauthorized('upstream returned 401');
     const { client } = makeClient(() => Promise.resolve(err(upstream)));
 
-    const result = await getMyProfile(client, { consent: true, include_spaces: false });
+    const result = await getMyProfile(client, { include_spaces: false });
 
     expect(isErr(result)).toBe(true);
     if (!isErr(result)) return;
@@ -145,7 +164,7 @@ describe('getMyProfile', () => {
     });
     const client: GetClient = { get: spy as unknown as GetClient['get'] };
 
-    const result = await getMyProfile(client, { consent: true });
+    const result = await getMyProfile(client);
 
     expect(isErr(result)).toBe(true);
     if (!isErr(result)) return;
