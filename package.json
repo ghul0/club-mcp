@@ -19,7 +19,7 @@
       "pnpm typecheck"
     ],
     "scripts/**/*.ts": [
-      "pnpm typecheck:scripts"
+      "sh -c 'pnpm typecheck:scripts'"
     ]
   },
   "devDependencies": {
