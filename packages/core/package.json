@@ -1,6 +1,27 @@
 {
   "name": "@hhc-mcp/core",
-  "version": "0.0.0",
+  "version": "0.0.1",
+  "description": "Framework-agnostic core library: GET-only HTTP client, Zod envelopes, and 13 read-only operations for the Hyper Human Club / Fluent Community REST API.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "hyper-human-club",
+    "fluent-community",
+    "wordpress",
+    "rest-api",
+    "read-only",
+    "zod",
+    "typescript"
+  ],
+  "homepage": "https://github.com/ghul0/club-mcp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ghul0/club-mcp.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/ghul0/club-mcp/issues"
+  },
   "type": "module",
   "license": "MIT",
   "exports": {
@@ -9,6 +30,11 @@
       "import": "./dist/index.js"
     }
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",

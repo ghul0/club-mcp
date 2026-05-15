@@ -52,4 +52,4 @@ pnpm add @hhc-mcp/http
 
 ## License
 
-MIT.
+MIT — see [LICENSE](./LICENSE).
