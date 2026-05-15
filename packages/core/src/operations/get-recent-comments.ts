@@ -72,7 +72,17 @@ const extractCommentPage = (
   return { items, hasMore };
 };
 
-const fetchRecentFeeds = async (
+const feedActivityAt = (feed: Feed): string | undefined => {
+  if (typeof feed.last_comment_at === 'string' && feed.last_comment_at.length > 0) {
+    return feed.last_comment_at;
+  }
+  if (typeof feed.updated_at === 'string' && feed.updated_at.length > 0) {
+    return feed.updated_at;
+  }
+  return undefined;
+};
+
+const fetchActivityFeeds = async (
   client: GetClient,
   since: string,
   scanFeedLimit: number,
@@ -89,18 +99,18 @@ const fetchRecentFeeds = async (
       return err(response.error);
     }
     const { items, hasMore } = extractFeedPage(response.value, req.perPage);
-    const recent: Feed[] = [];
+    const kept: Feed[] = [];
     let stop = false;
     for (const item of items) {
-      if (item.created_at >= since) {
-        recent.push(item);
-      } else {
+      const activity = feedActivityAt(item);
+      if (activity !== undefined && activity < since) {
         stop = true;
         break;
       }
+      kept.push(item);
     }
     return ok({
-      items: recent,
+      items: kept,
       hasMore: !stop && hasMore,
       totalScanned: items.length,
     });
@@ -117,6 +127,7 @@ const fetchCommentsForFeed = async (
   client: GetClient,
   feedId: number,
   since: string,
+  includeEdits: boolean,
   maxComments: number,
 ): Promise<Result<ReadonlyArray<Comment>, AppError>> => {
   const path = `/feeds/${String(feedId)}/comments`;
@@ -142,7 +153,15 @@ const fetchCommentsForFeed = async (
   if (!collected.ok) {
     return err(collected.error);
   }
-  const filtered = collected.value.filter((c) => c.created_at >= since);
+  const filtered = collected.value.filter((c) => {
+    if (c.created_at >= since) {
+      return true;
+    }
+    if (includeEdits && typeof c.updated_at === 'string' && c.updated_at >= since) {
+      return true;
+    }
+    return false;
+  });
   return ok(filtered);
 };
 
@@ -163,7 +182,7 @@ export const getRecentComments = async (
   }
   const since = sinceResult.value;
 
-  const feedsResult = await fetchRecentFeeds(client, since, resolved.scan_feed_limit);
+  const feedsResult = await fetchActivityFeeds(client, since, resolved.scan_feed_limit);
   if (!feedsResult.ok) {
     return err(feedsResult.error);
   }
@@ -175,7 +194,7 @@ export const getRecentComments = async (
 
   const perFeedResults = await concurrentMap<Feed, Result<ReadonlyArray<Comment>, AppError>>(
     feeds,
-    (f) => fetchCommentsForFeed(client, f.id, since, resolved.comment_per_feed_limit),
+    (f) => fetchCommentsForFeed(client, f.id, since, resolved.include_edits, resolved.comment_per_feed_limit),
     resolved.concurrency,
   );
 
