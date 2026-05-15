@@ -101,7 +101,7 @@ const validateOutput = <T>(
       ),
     );
   }
-  return ok(result.value);
+  return ok(parsed.data as T);
 };
 
 const tools: readonly ToolEntry[] = [
