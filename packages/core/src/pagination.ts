@@ -1,7 +1,6 @@
 import type { Result } from './result.js';
 import { err, ok } from './result.js';
 import type { AppError } from './errors.js';
-import { externalService } from './errors.js';
 
 export interface PageRequest {
   readonly page: number;
@@ -18,16 +17,11 @@ export interface PaginateOptions {
   readonly maxItems?: number;
   readonly maxPages?: number;
   readonly perPage?: number;
-  readonly signal?: AbortSignal;
 }
 
 const DEFAULT_MAX_ITEMS = 500;
 const DEFAULT_MAX_PAGES = 20;
 const DEFAULT_PER_PAGE = 100;
-
-const abortedError = (): AppError => externalService('pagination aborted by signal');
-
-const isAborted = (signal: AbortSignal | undefined): boolean => signal !== undefined && signal.aborted;
 
 export async function paginate<T>(
   fetchPage: (req: PageRequest) => Promise<Result<Page<T>, AppError>>,
@@ -36,11 +30,6 @@ export async function paginate<T>(
   const maxItems = options?.maxItems ?? DEFAULT_MAX_ITEMS;
   const maxPages = options?.maxPages ?? DEFAULT_MAX_PAGES;
   const perPage = options?.perPage ?? DEFAULT_PER_PAGE;
-  const signal = options?.signal;
-
-  if (isAborted(signal)) {
-    return err(abortedError());
-  }
 
   const collected: T[] = [];
   let pageNumber = 1;
@@ -65,10 +54,6 @@ export async function paginate<T>(
 
     if (!result.value.hasMore) {
       return ok(collected);
-    }
-
-    if (isAborted(signal)) {
-      return err(abortedError());
     }
 
     pageNumber += 1;

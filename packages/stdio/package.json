@@ -1,6 +1,29 @@
 {
   "name": "@hhc-mcp/stdio",
-  "version": "0.0.0",
+  "version": "0.0.1",
+  "description": "Local stdio Model Context Protocol (MCP) server exposing 13 read-only Hyper Human Club tools to Claude Desktop, Cursor, and any MCP-compliant client.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "stdio",
+    "claude-desktop",
+    "cursor",
+    "hyper-human-club",
+    "fluent-community",
+    "wordpress",
+    "read-only",
+    "typescript"
+  ],
+  "homepage": "https://github.com/ghul0/club-mcp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ghul0/club-mcp.git",
+    "directory": "packages/stdio"
+  },
+  "bugs": {
+    "url": "https://github.com/ghul0/club-mcp/issues"
+  },
   "type": "module",
   "license": "MIT",
   "bin": {

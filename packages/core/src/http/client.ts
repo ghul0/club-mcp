@@ -4,6 +4,7 @@ import { err, ok } from '../result.js';
 import type { AppError } from '../errors.js';
 import {
   externalService,
+  externalServiceNonRetryable,
   rateLimit,
   upstreamForbidden,
   upstreamNotFound,
@@ -99,7 +100,7 @@ const mapStatusToError = (status: number): AppError => {
   if (status >= 500 && status <= 599) {
     return externalService(`upstream server error (${String(status)})`);
   }
-  return { ...externalService(`upstream client error (${String(status)})`), retryable: false };
+  return externalServiceNonRetryable(`upstream client error (${String(status)})`);
 };
 
 const isAbortError = (e: unknown): boolean => {
@@ -188,17 +189,11 @@ export function createHttpClient(options: HttpClientOptions): GetClient {
         try {
           body = await response.json();
         } catch (e: unknown) {
-          return err({
-            ...externalService('failed to parse upstream JSON', { cause: e }),
-            retryable: false,
-          });
+          return err(externalServiceNonRetryable('failed to parse upstream JSON', { cause: e }));
         }
         const parsed = schema.safeParse(body);
         if (!parsed.success) {
-          return err({
-            ...externalService(formatZodIssues(parsed.error)),
-            retryable: false,
-          });
+          return err(externalServiceNonRetryable(formatZodIssues(parsed.error)));
         }
         return ok(parsed.data as z.infer<TSchema>);
       }

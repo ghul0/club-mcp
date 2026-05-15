@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ok, err, validationError, type GetClient } from '../../core/src/index.js';
+import { ok, err, validationError, type GetClient } from '@hhc-mcp/core';
 import { callTool, listToolDefinitions } from '../src/tools.js';
 
 const EXPECTED_TOOL_NAMES: readonly string[] = [

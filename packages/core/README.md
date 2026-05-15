@@ -105,4 +105,4 @@ Exceptions are reserved for programmer errors (invalid base URL, invalid path).
 
 ## License
 
-MIT.
+MIT — see [LICENSE](./LICENSE).

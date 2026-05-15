@@ -78,8 +78,8 @@ All 13 tools are READ-ONLY (ADR-006). Each declares `readOnlyHint: true` and
 | `club_get_unread_notifications` | Authenticated user's unread notifications                  |
 | `club_search_content`           | Search across members + posts + comments (fan-out)         |
 
-See [docs/read-only-tools.md](../../docs/read-only-tools.md) for the full tool
-contracts.
+See [docs/read-only-tools.md](https://github.com/ghul0/club-mcp/blob/main/docs/read-only-tools.md)
+for the full tool contracts.
 
 ## Security
 
@@ -105,12 +105,17 @@ contracts.
 
 ## Design references
 
-- `docs/adr/004-pnpm-monorepo-packages.md` — package boundaries.
-- `docs/adr/005-distribution-targets.md` — stdio as primary distribution.
-- `docs/adr/006-read-only-v1.md` — read-only-only contract.
-- `docs/adr/008-error-model.md` — `Result<T, AppError>` model.
-- `docs/read-only-tools.md` — tool catalog.
+- [docs/adr/004-pnpm-monorepo-packages.md](https://github.com/ghul0/club-mcp/blob/main/docs/adr/004-pnpm-monorepo-packages.md)
+  — package boundaries.
+- [docs/adr/005-distribution-targets.md](https://github.com/ghul0/club-mcp/blob/main/docs/adr/005-distribution-targets.md)
+  — stdio as primary distribution.
+- [docs/adr/006-read-only-v1.md](https://github.com/ghul0/club-mcp/blob/main/docs/adr/006-read-only-v1.md)
+  — read-only-only contract.
+- [docs/adr/008-error-model.md](https://github.com/ghul0/club-mcp/blob/main/docs/adr/008-error-model.md)
+  — `Result<T, AppError>` model.
+- [docs/read-only-tools.md](https://github.com/ghul0/club-mcp/blob/main/docs/read-only-tools.md)
+  — tool catalog.
 
 ## License
 
-MIT — see [LICENSE](../../LICENSE).
+MIT — see [LICENSE](./LICENSE).

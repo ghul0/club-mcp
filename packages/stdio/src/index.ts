@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import process from 'node:process';
-import { createHttpClient, createBasicAuthProvider } from '@hhc-mcp/core';
+import { createHttpClient, loadBasicAuthFromEnv } from '@hhc-mcp/core';
 import { loadStdioConfig } from './env.js';
 import { createLogger, type Logger } from './logger.js';
 import { runStdioServer } from './server.js';
@@ -30,10 +30,18 @@ export const main = async (deps: MainDeps): Promise<void> => {
   }
 
   const config = configResult.value;
-  const authProvider = createBasicAuthProvider(config.user, config.appPass);
+  const authResult = loadBasicAuthFromEnv(deps.env);
+  if (!authResult.ok) {
+    logger.error('config error', {
+      code: authResult.error.code,
+      message: authResult.error.message,
+    });
+    exit(1);
+    return;
+  }
   const client = createHttpClient({
     baseUrl: config.baseUrl,
-    authHeader: authProvider,
+    authHeader: authResult.value,
   });
 
   await runStdioServer({ config, client, logger });
