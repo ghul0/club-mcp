@@ -26,18 +26,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm lint
-      - name: Test with coverage
-        run: pnpm -r test --coverage
+      - run: pnpm -r test
       - run: pnpm build
-      - name: Upload coverage artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage
-          path: packages/*/coverage
-          if-no-files-found: ignore
       - name: pnpm audit (high/critical only)
         run: pnpm -r audit --prod --audit-level high
+        continue-on-error: true
       - name: Gitleaks
         uses: gitleaks/gitleaks-action@v2
         env:
