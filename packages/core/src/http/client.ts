@@ -34,6 +34,8 @@ const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_USER_AGENT = 'hhc-mcp/0.0.0 (+https://github.com/ghul0/club-mcp)';
 const BACKOFF_BASE_MS: ReadonlyArray<number> = [250, 1000, 2500];
 
+export const FLUENT_COMMUNITY_API_PREFIX = '/wp-json/fluent-community/v2';
+
 const normalizeBaseUrl = (raw: string): string => {
   const trimmed = raw.replace(/\/+$/, '');
   const parsed = new URL(trimmed);
@@ -72,7 +74,7 @@ const buildUrl = (
   path: string,
   query?: Record<string, string | number | boolean | undefined>,
 ): string => {
-  const url = new URL(`${baseUrl}${path}`);
+  const url = new URL(`${baseUrl}${FLUENT_COMMUNITY_API_PREFIX}${path}`);
   if (query) {
     for (const [key, value] of Object.entries(query)) {
       if (value === undefined) {

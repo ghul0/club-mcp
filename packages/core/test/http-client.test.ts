@@ -2,10 +2,11 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { setupServer } from 'msw/node';
 import { http, HttpResponse, delay } from 'msw';
 import { z } from 'zod';
-import { createHttpClient } from '../src/http/client.js';
+import { createHttpClient, FLUENT_COMMUNITY_API_PREFIX } from '../src/http/client.js';
 import { isErr, isOk } from '../src/result.js';
 
 const BASE = 'https://club.hyperhuman.pl';
+const PREFIX = FLUENT_COMMUNITY_API_PREFIX;
 
 const server = setupServer();
 
@@ -26,7 +27,7 @@ const PingSchema = z.object({ ok: z.boolean(), name: z.string() });
 describe('createHttpClient', () => {
   it('returns ok(value) for 200 JSON matching schema', async () => {
     server.use(
-      http.get(`${BASE}/api/ping`, () => HttpResponse.json({ ok: true, name: 'pong' })),
+      http.get(`${BASE}${PREFIX}/api/ping`, () => HttpResponse.json({ ok: true, name: 'pong' })),
     );
 
     const client = createHttpClient({ baseUrl: BASE, maxRetries: 0 });
@@ -39,7 +40,7 @@ describe('createHttpClient', () => {
 
   it('maps 401 to upstream_unauthorized', async () => {
     server.use(
-      http.get(`${BASE}/api/secret`, () => HttpResponse.json({}, { status: 401 })),
+      http.get(`${BASE}${PREFIX}/api/secret`, () => HttpResponse.json({}, { status: 401 })),
     );
 
     const client = createHttpClient({ baseUrl: BASE, maxRetries: 0 });
@@ -53,7 +54,7 @@ describe('createHttpClient', () => {
 
   it('maps 403 to upstream_forbidden', async () => {
     server.use(
-      http.get(`${BASE}/api/secret`, () => HttpResponse.json({}, { status: 403 })),
+      http.get(`${BASE}${PREFIX}/api/secret`, () => HttpResponse.json({}, { status: 403 })),
     );
 
     const client = createHttpClient({ baseUrl: BASE, maxRetries: 0 });
@@ -66,7 +67,7 @@ describe('createHttpClient', () => {
 
   it('maps 404 to upstream_not_found', async () => {
     server.use(
-      http.get(`${BASE}/api/missing`, () => HttpResponse.json({}, { status: 404 })),
+      http.get(`${BASE}${PREFIX}/api/missing`, () => HttpResponse.json({}, { status: 404 })),
     );
 
     const client = createHttpClient({ baseUrl: BASE, maxRetries: 0 });
@@ -80,7 +81,7 @@ describe('createHttpClient', () => {
   it('maps 429 with retries exhausted to rate_limit', async () => {
     let calls = 0;
     server.use(
-      http.get(`${BASE}/api/throttled`, () => {
+      http.get(`${BASE}${PREFIX}/api/throttled`, () => {
         calls += 1;
         return HttpResponse.json({}, { status: 429 });
       }),
@@ -99,7 +100,7 @@ describe('createHttpClient', () => {
   it('retries 500 and returns ok when subsequent call succeeds', async () => {
     let calls = 0;
     server.use(
-      http.get(`${BASE}/api/flaky`, () => {
+      http.get(`${BASE}${PREFIX}/api/flaky`, () => {
         calls += 1;
         if (calls === 1) {
           return HttpResponse.json({}, { status: 500 });
@@ -120,7 +121,7 @@ describe('createHttpClient', () => {
   it('maps persistent 500 to external_service retryable after retries exhausted', async () => {
     let calls = 0;
     server.use(
-      http.get(`${BASE}/api/broken`, () => {
+      http.get(`${BASE}${PREFIX}/api/broken`, () => {
         calls += 1;
         return HttpResponse.json({}, { status: 500 });
       }),
@@ -139,7 +140,7 @@ describe('createHttpClient', () => {
   it('does NOT retry 400-class (except 429); maps to external_service non-retryable', async () => {
     let calls = 0;
     server.use(
-      http.get(`${BASE}/api/bad`, () => {
+      http.get(`${BASE}${PREFIX}/api/bad`, () => {
         calls += 1;
         return HttpResponse.json({}, { status: 400 });
       }),
@@ -157,7 +158,7 @@ describe('createHttpClient', () => {
 
   it('maps Zod parse failure to external_service non-retryable with parse details', async () => {
     server.use(
-      http.get(`${BASE}/api/ping`, () => HttpResponse.json({ ok: 'not-a-bool', name: 42 })),
+      http.get(`${BASE}${PREFIX}/api/ping`, () => HttpResponse.json({ ok: 'not-a-bool', name: 42 })),
     );
 
     const client = createHttpClient({ baseUrl: BASE, maxRetries: 0 });
@@ -172,7 +173,7 @@ describe('createHttpClient', () => {
 
   it('maps timeout to external_service retryable', async () => {
     server.use(
-      http.get(`${BASE}/api/slow`, async () => {
+      http.get(`${BASE}${PREFIX}/api/slow`, async () => {
         await delay(200);
         return HttpResponse.json({ ok: true, name: 'late' });
       }),
@@ -189,7 +190,7 @@ describe('createHttpClient', () => {
 
   it('rejects 3xx redirect responses as external_service', async () => {
     server.use(
-      http.get(`${BASE}/api/redirect`, () =>
+      http.get(`${BASE}${PREFIX}/api/redirect`, () =>
         new HttpResponse(null, { status: 302, headers: { Location: 'https://evil.example/' } }),
       ),
     );
@@ -221,7 +222,7 @@ describe('createHttpClient', () => {
     const authHeader = vi.fn(() => 'Basic abc==');
     let seenAuth: string | null = null;
     server.use(
-      http.get(`${BASE}/api/ping`, ({ request }) => {
+      http.get(`${BASE}${PREFIX}/api/ping`, ({ request }) => {
         seenAuth = request.headers.get('authorization');
         return HttpResponse.json({ ok: true, name: 'pong' });
       }),
@@ -238,7 +239,7 @@ describe('createHttpClient', () => {
   it('encodes query params and drops undefined values', async () => {
     let seenUrl = '';
     server.use(
-      http.get(`${BASE}/api/search`, ({ request }) => {
+      http.get(`${BASE}${PREFIX}/api/search`, ({ request }) => {
         seenUrl = request.url;
         return HttpResponse.json({ ok: true, name: 'q' });
       }),
@@ -263,7 +264,7 @@ describe('createHttpClient', () => {
   it('sends a User-Agent header by default', async () => {
     let seenUa: string | null = null;
     server.use(
-      http.get(`${BASE}/api/ping`, ({ request }) => {
+      http.get(`${BASE}${PREFIX}/api/ping`, ({ request }) => {
         seenUa = request.headers.get('user-agent');
         return HttpResponse.json({ ok: true, name: 'pong' });
       }),
@@ -277,7 +278,7 @@ describe('createHttpClient', () => {
 
   it('maps network error to external_service retryable', async () => {
     server.use(
-      http.get(`${BASE}/api/down`, () => HttpResponse.error()),
+      http.get(`${BASE}${PREFIX}/api/down`, () => HttpResponse.error()),
     );
 
     const client = createHttpClient({ baseUrl: BASE, maxRetries: 0 });
@@ -287,5 +288,59 @@ describe('createHttpClient', () => {
     if (!isErr(result)) return;
     expect(result.error.code).toBe('external_service');
     expect(result.error.retryable).toBe(true);
+  });
+
+  it('automatically prepends Fluent Community API prefix to request paths', async () => {
+    let seenUrl = '';
+    server.use(
+      http.get(`${BASE}${PREFIX}/members`, ({ request }) => {
+        seenUrl = request.url;
+        return HttpResponse.json({ ok: true, name: 'pong' });
+      }),
+    );
+
+    const client = createHttpClient({ baseUrl: BASE, maxRetries: 0 });
+    const result = await client.get('/members', PingSchema);
+
+    expect(isOk(result)).toBe(true);
+    const parsed = new URL(seenUrl);
+    expect(parsed.pathname).toBe(`${PREFIX}/members`);
+  });
+
+  it('exports FLUENT_COMMUNITY_API_PREFIX with the expected value', () => {
+    expect(FLUENT_COMMUNITY_API_PREFIX).toBe('/wp-json/fluent-community/v2');
+  });
+
+  it('prepends the prefix exactly once and does not double it', async () => {
+    let seenPath = '';
+    server.use(
+      http.get(`${BASE}${PREFIX}/feeds/123/by-id`, ({ request }) => {
+        seenPath = new URL(request.url).pathname;
+        return HttpResponse.json({ ok: true, name: 'feed' });
+      }),
+    );
+
+    const client = createHttpClient({ baseUrl: BASE, maxRetries: 0 });
+    const result = await client.get('/feeds/123/by-id', PingSchema);
+
+    expect(isOk(result)).toBe(true);
+    expect(seenPath).toBe(`${PREFIX}/feeds/123/by-id`);
+    expect(seenPath.match(/\/wp-json/g)?.length).toBe(1);
+  });
+
+  it('normalizes trailing slash on baseUrl and still produces a single prefix', async () => {
+    let seenPath = '';
+    server.use(
+      http.get(`${BASE}${PREFIX}/members`, ({ request }) => {
+        seenPath = new URL(request.url).pathname;
+        return HttpResponse.json({ ok: true, name: 'pong' });
+      }),
+    );
+
+    const client = createHttpClient({ baseUrl: `${BASE}/`, maxRetries: 0 });
+    const result = await client.get('/members', PingSchema);
+
+    expect(isOk(result)).toBe(true);
+    expect(seenPath).toBe(`${PREFIX}/members`);
   });
 });

@@ -85,7 +85,12 @@ const INPUT_SCHEMAS: readonly string[] = [
   'GetSinceSummaryInputSchema',
 ];
 
-const CONSTANTS: readonly string[] = ['packageName', 'DEFAULT_CONCURRENCY', 'MAX_CONCURRENCY'];
+const CONSTANTS: readonly string[] = [
+  'packageName',
+  'DEFAULT_CONCURRENCY',
+  'MAX_CONCURRENCY',
+  'FLUENT_COMMUNITY_API_PREFIX',
+];
 
 const EXPECTED_RUNTIME_EXPORTS: ReadonlyArray<string> = [
   ...FUNCTIONS,
