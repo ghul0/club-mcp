@@ -26,3 +26,4 @@ export * from './operations/list-spaces.js';
 export * from './operations/list-courses.js';
 export * from './operations/get-unread-notifications.js';
 export * from './operations/get-user-comments.js';
+export * from './operations/get-since-summary.js';

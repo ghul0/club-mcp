@@ -44,6 +44,7 @@ const OPERATIONS: readonly string[] = [
   'listCourses',
   'getUnreadNotifications',
   'getUserComments',
+  'getSinceSummary',
 ];
 
 const SCHEMAS: readonly string[] = [
@@ -83,6 +84,7 @@ const INPUT_SCHEMAS: readonly string[] = [
   'ListCoursesInputSchema',
   'GetUnreadNotificationsInputSchema',
   'GetUserCommentsInputSchema',
+  'GetSinceSummaryInputSchema',
 ];
 
 const CONSTANTS: readonly string[] = ['packageName', 'DEFAULT_CONCURRENCY', 'MAX_CONCURRENCY'];
@@ -149,8 +151,8 @@ describe('@hhc-mcp/core public exports (ADR-004 boundary)', () => {
     expect(typeof Core.redactBasicAuth).toBe('function');
   });
 
-  it('exposes all 12 operation functions', () => {
-    expect(OPERATIONS.length).toBe(12);
+  it('exposes all 13 operation functions', () => {
+    expect(OPERATIONS.length).toBe(13);
     for (const op of OPERATIONS) {
       expect(typeof Core[op as keyof typeof Core]).toBe('function');
     }
@@ -165,8 +167,8 @@ describe('@hhc-mcp/core public exports (ADR-004 boundary)', () => {
     }
   });
 
-  it('exposes all 12 operation input schemas with parse method', () => {
-    expect(INPUT_SCHEMAS.length).toBe(12);
+  it('exposes all 13 operation input schemas with parse method', () => {
+    expect(INPUT_SCHEMAS.length).toBe(13);
     for (const name of INPUT_SCHEMAS) {
       const schema = Core[name as keyof typeof Core] as { parse?: unknown; safeParse?: unknown } | undefined;
       expect(schema).toBeDefined();
@@ -234,6 +236,8 @@ describe('@hhc-mcp/core type-level public surface (ADR-004)', () => {
     type _GetUnreadNotificationsOutput = Core.GetUnreadNotificationsOutput;
     type _GetUserCommentsInput = Core.GetUserCommentsInput;
     type _GetUserCommentsOutput = Core.GetUserCommentsOutput;
+    type _GetSinceSummaryInput = Core.GetSinceSummaryInput;
+    type _GetSinceSummaryOutput = Core.GetSinceSummaryOutput;
 
     const witness: _Result = Core.ok(1);
     expect(witness.ok).toBe(true);
