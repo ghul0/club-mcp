@@ -9,9 +9,7 @@ import {
   type NotificationItem,
 } from '../schemas/notifications.js';
 
-export const GetUnreadNotificationsInputSchema = z.object({
-  limit: z.number().int().positive().max(200).optional().default(50),
-});
+export const GetUnreadNotificationsInputSchema = z.object({}).strict();
 
 export type GetUnreadNotificationsInput = z.input<typeof GetUnreadNotificationsInputSchema>;
 
@@ -49,11 +47,7 @@ export const getUnreadNotifications = async (
     return err(validationError(formatIssues(parsed.error)));
   }
 
-  const { limit } = parsed.data;
-
-  const response = await client.get(NOTIFICATIONS_PATH, UnreadNotificationsResponseSchema, {
-    per_page: limit,
-  });
+  const response = await client.get(NOTIFICATIONS_PATH, UnreadNotificationsResponseSchema);
 
   if (!response.ok) {
     return err(response.error);

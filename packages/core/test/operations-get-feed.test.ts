@@ -27,7 +27,7 @@ describe('getFeed', () => {
       schema: TSchema,
     ) => ok(schema.parse({ feed: sampleFeed })));
 
-    const result = await getFeed(client, { feedId: 42 });
+    const result = await getFeed(client, { feed_id: 42 });
 
     expect(isOk(result)).toBe(true);
     if (!isOk(result)) return;
@@ -35,22 +35,15 @@ describe('getFeed', () => {
     expect(spy).toHaveBeenCalledWith('/feeds/42/by-id', expect.anything());
   });
 
-  it('accepts string ids and forwards them in the path', async () => {
+  it('rejects string feed_id (doc spec: positive integer only)', async () => {
     const { client, spy } = createMockClient(async <TSchema extends z.ZodTypeAny>(
       _path: string,
       schema: TSchema,
     ) => ok(schema.parse({ feed: sampleFeed })));
 
-    const result = await getFeed(client, { feedId: '42' });
-
-    expect(isOk(result)).toBe(true);
-    expect(spy).toHaveBeenCalledWith('/feeds/42/by-id', expect.anything());
-  });
-
-  it('returns validation error for empty string feedId', async () => {
-    const { client, spy } = createMockClient(async () => ok({ feed: sampleFeed }));
-
-    const result = await getFeed(client, { feedId: '' });
+    const result = await getFeed(client, {
+      feed_id: '42' as unknown as number,
+    });
 
     expect(isErr(result)).toBe(true);
     if (!isErr(result)) return;
@@ -58,10 +51,10 @@ describe('getFeed', () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
-  it('returns validation error for non-positive numeric feedId', async () => {
+  it('returns validation error for non-positive numeric feed_id', async () => {
     const { client, spy } = createMockClient(async () => ok({ feed: sampleFeed }));
 
-    const result = await getFeed(client, { feedId: 0 });
+    const result = await getFeed(client, { feed_id: 0 });
 
     expect(isErr(result)).toBe(true);
     if (!isErr(result)) return;
@@ -72,21 +65,39 @@ describe('getFeed', () => {
   it('propagates upstream_not_found from client', async () => {
     const { client } = createMockClient(async () => err(upstreamNotFound('upstream returned 404')));
 
-    const result = await getFeed(client, { feedId: 999 });
+    const result = await getFeed(client, { feed_id: 999 });
 
     expect(isErr(result)).toBe(true);
     if (!isErr(result)) return;
     expect(result.error.code).toBe('upstream_not_found');
   });
 
-  it('url-encodes string feedId path segment', async () => {
+  it('rejects non-integer feed_id (doc spec: integer only)', async () => {
+    const { client, spy } = createMockClient(async () => ok({ feed: sampleFeed }));
+
+    const result = await getFeed(client, {
+      feed_id: 3.5 as unknown as number,
+    });
+
+    expect(isErr(result)).toBe(true);
+    if (!isErr(result)) return;
+    expect(result.error.code).toBe('validation');
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('accepts include_comments + comment_limit per docs (deferred fetch in Fix-G)', async () => {
     const { client, spy } = createMockClient(async <TSchema extends z.ZodTypeAny>(
       _path: string,
       schema: TSchema,
     ) => ok(schema.parse({ feed: sampleFeed })));
 
-    await getFeed(client, { feedId: 'a/b' });
+    const result = await getFeed(client, {
+      feed_id: 42,
+      include_comments: true,
+      comment_limit: 200,
+    });
 
-    expect(spy).toHaveBeenCalledWith('/feeds/a%2Fb/by-id', expect.anything());
+    expect(isOk(result)).toBe(true);
+    expect(spy).toHaveBeenCalledWith('/feeds/42/by-id', expect.anything());
   });
 });

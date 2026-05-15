@@ -59,17 +59,24 @@ describe('MemberSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('allows unknown additional fields via passthrough', () => {
+  it('strips unknown additional fields (Output DTO allowlist)', () => {
     const parsed = MemberSchema.parse({
       user_id: 1,
       display_name: 'Ada',
       username: 'ada',
       future_field: 'preserved',
       another: 99,
+      email: 'ada@example.com',
+      wp_user_id: 12345,
+      user_email: 'private@example.com',
     }) as Record<string, unknown>;
 
-    expect(parsed.future_field).toBe('preserved');
-    expect(parsed.another).toBe(99);
+    expect(parsed.future_field).toBeUndefined();
+    expect(parsed.another).toBeUndefined();
+    expect(parsed.email).toBeUndefined();
+    expect(parsed.wp_user_id).toBeUndefined();
+    expect(parsed.user_email).toBeUndefined();
+    expect(parsed.user_id).toBe(1);
   });
 
   it('accepts null for nullable optional fields', () => {
@@ -125,13 +132,13 @@ describe('MembersResponseSchema', () => {
     }
   });
 
-  it('preserves unknown top-level fields via passthrough', () => {
+  it('strips unknown top-level fields (Output DTO allowlist)', () => {
     const parsed = MembersResponseSchema.parse({
       members: [{ user_id: 1, display_name: 'Ada', username: 'ada' }],
       meta: { generated_at: '2026-05-14T23:00:00Z' },
     }) as Record<string, unknown>;
 
-    expect(parsed.meta).toEqual({ generated_at: '2026-05-14T23:00:00Z' });
+    expect(parsed.meta).toBeUndefined();
   });
 
   it('rejects when members is missing', () => {

@@ -67,7 +67,7 @@ describe('searchMembers', () => {
     expect(args?.[2]).toEqual({ search: 'thomas', per_page: 25 });
   });
 
-  it('defaults limit to 50 when omitted', async () => {
+  it('defaults limit to 20 when omitted (per docs/read-only-tools.md)', async () => {
     const getMock = vi.fn(() =>
       Promise.resolve(ok({ members: [] as Array<{ user_id: number; display_name: string; username: string }> })),
     );
@@ -76,7 +76,7 @@ describe('searchMembers', () => {
     await searchMembers(client, { query: 'q' });
 
     const args = getMock.mock.calls[0];
-    expect(args?.[2]).toEqual({ search: 'q', per_page: 50 });
+    expect(args?.[2]).toEqual({ search: 'q', per_page: 20 });
   });
 
   it('returns validation error for empty query', async () => {
@@ -116,12 +116,24 @@ describe('searchMembers', () => {
     expect(result.error.code).toBe('validation');
   });
 
-  it('returns validation error when query exceeds 100 chars', async () => {
+  it('accepts queries up to 200 chars (doc spec)', async () => {
+    const getMock = vi.fn(() =>
+      Promise.resolve(ok({ members: [] as Array<{ user_id: number; display_name: string; username: string }> })),
+    );
+    const client: GetClient = { get: getMock as unknown as GetClient['get'] };
+
+    const result = await searchMembers(client, { query: 'a'.repeat(200) });
+
+    expect(isOk(result)).toBe(true);
+    expect(getMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns validation error when query exceeds 200 chars', async () => {
     const client = makeClient(() => {
       throw new Error('should not be called');
     });
 
-    const result = await searchMembers(client, { query: 'a'.repeat(101) });
+    const result = await searchMembers(client, { query: 'a'.repeat(201) });
 
     expect(isErr(result)).toBe(true);
     if (!isErr(result)) return;
