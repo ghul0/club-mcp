@@ -1,0 +1,14 @@
+version: 2
+secret:
+  paths_ignore:
+    - "**/*.test.ts"
+    - "**/test/**"
+    - "**/tests/**"
+    - "**/*.example"
+    - "**/.env.example"
+    - "**/docs/**"
+    - "**/*.md"
+    - "**/CHANGELOG.md"
+    - "pnpm-lock.yaml"
+    - "package-lock.json"
+  show_secrets: false
