@@ -1,12 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import {
-  ok,
-  err,
-  upstreamNotFound,
-  type GetClient,
-} from '../../core/src/index.js';
+import { ok, err, upstreamNotFound, type GetClient } from '@hhc-mcp/core';
 import { createLogger } from '../src/logger.js';
 import { createMcpServer, type ServerDeps } from '../src/server.js';
 

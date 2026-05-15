@@ -28,6 +28,7 @@ const constructorCases = [
   ['upstreamNotFound', ['missing upstream resource'], 'upstream_not_found', false, 'missing upstream resource'],
   ['rateLimit', ['upstream rate limit'], 'rate_limit', true, 'upstream rate limit'],
   ['externalService', ['upstream unavailable'], 'external_service', true, 'upstream unavailable'],
+  ['externalServiceNonRetryable', ['upstream client error'], 'external_service', false, 'upstream client error'],
   ['unsupportedAuth', ['unsupported authentication mode'], 'unsupported_auth', false, 'unsupported authentication mode'],
 ] as const;
 
