@@ -59,7 +59,7 @@ describe('basic auth', () => {
   });
 
   it('redactBasicAuth replaces Basic header value with placeholder', () => {
-    const before = 'Authorization: Basic YWxpY2U6c2VjcmV0Cg==';
+    const before = 'Authorization: Basic ZmFrZS10ZXN0LXBsYWNlaG9sZGVy';
     expect(redactBasicAuth(before)).toBe('Authorization: Basic [REDACTED]');
   });
 
