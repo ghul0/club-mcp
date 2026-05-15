@@ -75,4 +75,42 @@ describe('mapResultToTool', () => {
     expect(result.content).toEqual([{ type: 'text', text: 'items: a,b' }]);
     expect(result.structuredContent).toEqual({ result: value });
   });
+
+  it('redacts sensitive keys (email) in structuredContent.result (defense-in-depth)', () => {
+    const value = { email: 'foo@bar.com', display_name: 'Ada' };
+    const result = mapResultToTool(ok(value));
+
+    const structured = result.structuredContent as { result: Record<string, unknown> };
+    expect(structured.result.email).toBe('[REDACTED]');
+    expect(structured.result.display_name).toBe('Ada');
+  });
+
+  it('redacts sensitive keys recursively in nested arrays/objects', () => {
+    const value = {
+      members: [
+        { display_name: 'Ada', email: 'ada@example.com', token: 'abc' },
+        { display_name: 'Lin', secret: 'hidden', password: 'pw' },
+      ],
+    };
+    const result = mapResultToTool(ok(value));
+
+    const structured = result.structuredContent as {
+      result: { members: ReadonlyArray<Record<string, unknown>> };
+    };
+    expect(structured.result.members[0]?.email).toBe('[REDACTED]');
+    expect(structured.result.members[0]?.token).toBe('[REDACTED]');
+    expect(structured.result.members[0]?.display_name).toBe('Ada');
+    expect(structured.result.members[1]?.secret).toBe('[REDACTED]');
+    expect(structured.result.members[1]?.password).toBe('[REDACTED]');
+  });
+
+  it('redacts sensitive keys in the default text content serialization', () => {
+    const value = { email: 'leak@example.com', display_name: 'Ada' };
+    const result = mapResultToTool(ok(value));
+
+    const text = result.content[0]?.text ?? '';
+    expect(text).not.toContain('leak@example.com');
+    expect(text).toContain('[REDACTED]');
+    expect(text).toContain('Ada');
+  });
 });

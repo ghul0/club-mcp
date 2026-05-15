@@ -60,7 +60,7 @@ describe('CourseListItemSchema', () => {
     expect(parsed.success).toBe(true);
   });
 
-  it('preserves unknown fields via passthrough', () => {
+  it('strips unknown fields (Output DTO allowlist)', () => {
     const parsed = CourseListItemSchema.safeParse({
       ...baseCourse,
       track: 'beginner',
@@ -69,8 +69,9 @@ describe('CourseListItemSchema', () => {
     expect(parsed.success).toBe(true);
     if (parsed.success) {
       const data = parsed.data as { readonly track?: unknown; readonly future_field?: unknown };
+      // 'track' is declared and remains; 'future_field' is unknown and stripped.
       expect(data.track).toBe('beginner');
-      expect(data.future_field).toEqual({ nested: true });
+      expect(data.future_field).toBeUndefined();
     }
   });
 });
@@ -110,7 +111,7 @@ describe('CoursesResponseSchema', () => {
     expect(parsed.success).toBe(false);
   });
 
-  it('preserves unknown top-level fields via passthrough', () => {
+  it('strips unknown top-level fields (Output DTO allowlist)', () => {
     const parsed = CoursesResponseSchema.safeParse({
       courses: [baseCourse],
       count: 1,
@@ -118,7 +119,7 @@ describe('CoursesResponseSchema', () => {
     expect(parsed.success).toBe(true);
     if (parsed.success) {
       const data = parsed.data as { readonly count?: unknown };
-      expect(data.count).toBe(1);
+      expect(data.count).toBeUndefined();
     }
   });
 });
