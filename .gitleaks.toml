@@ -1,0 +1,26 @@
+title = "club-mcp gitleaks policy"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Files and patterns expected to contain credential-shaped placeholders or test fixtures"
+paths = [
+  '''\.env\.example$''',
+  '''docs/.*\.md$''',
+  '''\.gitleaks\.toml$''',
+  '''\.husky/.*''',
+  '''pnpm-lock\.yaml$''',
+]
+regexes = [
+  '''xxxx xxxx xxxx xxxx xxxx xxxx''',
+  '''sk-ant-[a-z0-9]+''',
+  '''sk-proj-[A-Za-z0-9]+''',
+  '''CHANGEME''',
+  '''YOUR_[A-Z_]+_HERE''',
+]
+stopwords = [
+  "example",
+  "placeholder",
+  "dummy",
+]

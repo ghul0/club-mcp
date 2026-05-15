@@ -17,15 +17,17 @@ Sessions persist on disk. Implementer reuses the same `impl-<ticket>` session ac
 
 ## Per-ticket flow
 
+Per ADR-018, dual review runs locally as a pre-push Husky hook, not in GitHub Actions.
+
 1. **Pick** — Planner moves the GitHub Issue from `Ready` to `In Progress`. Branch is created from `main` with the convention `<type>/<ticket-id>-<slug>` where `<type>` is `feat|fix|chore|docs|test|refactor|ci|build`.
 2. **Spec read** — Implementer reads the AC plus every referenced ADR, then posts a test list to the draft PR body. No production code yet.
 3. **Tests first (TDD red)** — Implementer commits only failing test files. Local `pnpm typecheck && pnpm lint && pnpm test` is expected to compile cleanly and report assertion failures only.
 4. **Implement (TDD green)** — Implementer makes the failing tests pass. Local full gate must pass: `pnpm install --frozen-lockfile && pnpm typecheck && pnpm lint && pnpm test -- --coverage && pnpm build`.
-5. **Mark ready** — PR moved out of draft.
-6. **Dual review** — `dual-review.yml` workflow fans out reviewer-a and reviewer-b in parallel. Each posts `APPROVE` or `REQUEST_CHANGES` with line-anchored comments via the corresponding GitHub App bot identity.
-7. **Fix loop** — On `REQUEST_CHANGES`, Implementer resumes the same `impl-<ticket>` session and pushes fixup commits. Commit subject prefix is `fix(review-a): ...` or `fix(review-b): ...`. Cap is 3 rounds.
-8. **Escalation** — If round 4 is reached, the merger workflow opens a comment that auto-assigns Architect to clarify the AC or open an ADR PR. The ticket is paused until Architect resolves.
-9. **Merge** — Merger squash-merges only when: both bots APPROVED on the latest SHA, all required CI checks green, no `do-not-merge` label, no merge conflicts. Branch is deleted; the GitHub Issue is moved to `Done`.
+5. **Local dual review on push** — `git push` triggers `.husky/pre-push` → `scripts/local-review.ts`. It spawns two `pi` processes in parallel (Reviewer-A = `openai-codex/gpt-5.5`, Reviewer-B = `claude-agent-sdk/claude-opus-4-7`) against `git diff @{u}..HEAD`. Each emits `VERDICT: APPROVE | REQUEST_CHANGES`. The hook exits non-zero if either reviewer requests changes; the push is blocked.
+6. **Fix loop** — On `REQUEST_CHANGES`, Implementer reads the reviewer output, fixes, commits, repeats `git push`. Cap is 3 rounds. After round 3, escalate to Architect (clarify AC, open ADR, or rebuild test list).
+7. **Emergency override** — `SKIP_LOCAL_REVIEW=1 git push` bypasses the hook. The reason MUST be documented in the PR body. Reviewers/Operator can require a re-run before merge.
+8. **PR open** — After successful push: `gh pr create -f` (or `--fill`) opens the PR. CI `verify` runs on the PR (typecheck, lint, test, build, coverage, gitleaks, audit).
+9. **Merge** — When CI `verify` is green, squash-merge: `gh pr merge <n> --squash --delete-branch`. Branch protection requires only the `verify` status check (per ADR-018, no required AI approvals — local dual review already enforces correctness pre-push).
 
 ## Conventional commit format
 
@@ -37,7 +39,7 @@ Sessions persist on disk. Implementer reuses the same `impl-<ticket>` session ac
 Refs: <ticket-id>
 ```
 
-Allowed types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `ci`, `build`. Allowed scopes: `core`, `stdio`, `http`, `deps`, `docs`, `ci`, `build`, `repo`.
+Allowed types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `ci`, `build`, `perf`, `revert` (enforced by `commitlint.config.js`). Allowed scopes: `core`, `stdio`, `http`, `deps`, `docs`, `ci`, `build`, `repo`, `scripts`, `adr` (enforced by `commitlint.config.js`).
 
 ## TDD discipline
 
