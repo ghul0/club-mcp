@@ -4,7 +4,7 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { ok, err, validationError, type GetClient } from '../../core/src/index.js';
+import { ok, err, validationError, type GetClient } from '@hhc-mcp/core';
 import { createLogger } from '../src/logger.js';
 import { createMcpServer, type ServerDeps } from '../src/server.js';
 import { listToolDefinitions } from '../src/tools.js';

@@ -84,5 +84,8 @@ export const rateLimit = (message: string, opts?: AppErrorOptions): AppError =>
 export const externalService = (message: string, opts?: AppErrorOptions): AppError =>
   createAppError('external_service', message, true, opts);
 
+export const externalServiceNonRetryable = (message: string, opts?: AppErrorOptions): AppError =>
+  createAppError('external_service', message, false, opts);
+
 export const unsupportedAuth = (message: string, opts?: AppErrorOptions): AppError =>
   createAppError('unsupported_auth', message, false, opts);

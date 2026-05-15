@@ -1,14 +1,30 @@
 {
   "name": "@hhc-mcp/http",
-  "version": "0.0.0",
+  "version": "0.0.1-scaffold.0",
+  "description": "Scaffold for the hosted Streamable HTTP MCP server (planned for v0.2.0+). Not yet functional.",
+  "private": true,
   "type": "module",
   "license": "MIT",
+  "homepage": "https://github.com/ghul0/club-mcp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ghul0/club-mcp.git",
+    "directory": "packages/http"
+  },
+  "bugs": {
+    "url": "https://github.com/ghul0/club-mcp/issues"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",

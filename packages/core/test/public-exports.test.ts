@@ -6,9 +6,6 @@ const FUNCTIONS: readonly string[] = [
   'err',
   'isOk',
   'isErr',
-  'map',
-  'flatMap',
-  'match',
   'validationError',
   'authMissing',
   'authInvalid',
@@ -17,6 +14,7 @@ const FUNCTIONS: readonly string[] = [
   'upstreamNotFound',
   'rateLimit',
   'externalService',
+  'externalServiceNonRetryable',
   'unsupportedAuth',
   'createHttpClient',
   'paginate',
@@ -99,7 +97,7 @@ const EXPECTED_RUNTIME_EXPORTS: ReadonlyArray<string> = [
 
 describe('@hhc-mcp/core public exports (ADR-004 boundary)', () => {
   it('exposes Result helpers as functions', () => {
-    const helpers: readonly string[] = ['ok', 'err', 'isOk', 'isErr', 'map', 'flatMap', 'match'];
+    const helpers: readonly string[] = ['ok', 'err', 'isOk', 'isErr'];
     for (const name of helpers) {
       expect(typeof Core[name as keyof typeof Core]).toBe('function');
     }
@@ -115,6 +113,7 @@ describe('@hhc-mcp/core public exports (ADR-004 boundary)', () => {
       'upstreamNotFound',
       'rateLimit',
       'externalService',
+      'externalServiceNonRetryable',
       'unsupportedAuth',
     ];
     for (const name of constructors) {

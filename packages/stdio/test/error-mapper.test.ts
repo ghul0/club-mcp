@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ok, err, validationError, rateLimit, externalService } from '../../core/src/index.js';
+import { ok, err, validationError, rateLimit, externalService } from '@hhc-mcp/core';
 import { mapResultToTool, type ToolContent } from '../src/error-mapper.js';
 
 describe('mapResultToTool', () => {
