@@ -6,10 +6,12 @@ import type { AppError } from '../errors.js';
 import { validationError } from '../errors.js';
 import { MembersResponseSchema, type Member } from '../schemas/members.js';
 
-export const SearchMembersInputSchema = z.object({
-  query: z.string().min(1).max(100),
-  limit: z.number().int().positive().max(100).optional().default(50),
-});
+export const SearchMembersInputSchema = z
+  .object({
+    query: z.string().min(1).max(200),
+    limit: z.number().int().positive().max(100).optional().default(20),
+  })
+  .strict();
 
 export type SearchMembersInput = z.input<typeof SearchMembersInputSchema>;
 

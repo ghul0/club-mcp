@@ -10,12 +10,16 @@ import { concurrentMap } from '../concurrency.js';
 import { FeedsListResponseSchema, type Feed } from '../schemas/feeds.js';
 import { CommentsResponseSchema, type Comment } from '../schemas/comments.js';
 
-export const GetRecentCommentsInputSchema = z.object({
-  since: z.string().min(1),
-  maxPosts: z.number().int().positive().max(200).optional().default(100),
-  maxCommentsPerPost: z.number().int().positive().max(200).optional().default(50),
-  concurrency: z.number().int().positive().max(8).optional().default(4),
-});
+export const GetRecentCommentsInputSchema = z
+  .object({
+    since: z.string().min(1).max(40),
+    include_edits: z.boolean().optional().default(true),
+    limit: z.number().int().positive().max(200).optional().default(100),
+    scan_feed_limit: z.number().int().positive().max(500).optional().default(300),
+    comment_per_feed_limit: z.number().int().positive().max(200).optional().default(100),
+    concurrency: z.number().int().positive().max(8).optional().default(4),
+  })
+  .strict();
 
 export type GetRecentCommentsInput = z.input<typeof GetRecentCommentsInputSchema>;
 type ResolvedInput = z.output<typeof GetRecentCommentsInputSchema>;
@@ -71,7 +75,7 @@ const extractCommentPage = (
 const fetchRecentFeeds = async (
   client: GetClient,
   since: string,
-  maxPosts: number,
+  scanFeedLimit: number,
 ): Promise<Result<ReadonlyArray<Feed>, AppError>> => {
   const fetchPage = async (
     req: PageRequest,
@@ -103,7 +107,7 @@ const fetchRecentFeeds = async (
   };
 
   return paginate<Feed>(fetchPage, {
-    maxItems: maxPosts,
+    maxItems: scanFeedLimit,
     perPage: FEEDS_PER_PAGE,
     maxPages: 20,
   });
@@ -159,7 +163,7 @@ export const getRecentComments = async (
   }
   const since = sinceResult.value;
 
-  const feedsResult = await fetchRecentFeeds(client, since, resolved.maxPosts);
+  const feedsResult = await fetchRecentFeeds(client, since, resolved.scan_feed_limit);
   if (!feedsResult.ok) {
     return err(feedsResult.error);
   }
@@ -171,7 +175,7 @@ export const getRecentComments = async (
 
   const perFeedResults = await concurrentMap<Feed, Result<ReadonlyArray<Comment>, AppError>>(
     feeds,
-    (f) => fetchCommentsForFeed(client, f.id, since, resolved.maxCommentsPerPost),
+    (f) => fetchCommentsForFeed(client, f.id, since, resolved.comment_per_feed_limit),
     resolved.concurrency,
   );
 
@@ -187,6 +191,12 @@ export const getRecentComments = async (
     }
     for (const c of r.value) {
       collected.push({ feed: { id: f.id, title: f.title }, comment: c });
+      if (collected.length >= resolved.limit) {
+        break;
+      }
+    }
+    if (collected.length >= resolved.limit) {
+      break;
     }
   }
 

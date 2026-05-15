@@ -72,7 +72,7 @@ const tools: readonly ToolEntry[] = [
   {
     def: {
       name: 'club_search_members',
-      description: 'Search Hyper Human Club members by query string.',
+      description: 'Find visible members/profiles by search text.',
       inputSchema: toJsonSchema(SearchMembersInputSchema),
       annotations: READ_ONLY_ANNOTATIONS,
     },
@@ -82,7 +82,7 @@ const tools: readonly ToolEntry[] = [
   {
     def: {
       name: 'club_get_profile',
-      description: 'Get the public profile of a Hyper Human Club member by username.',
+      description: 'Get visible profile fields for another user.',
       inputSchema: toJsonSchema(GetProfileInputSchema),
       annotations: READ_ONLY_ANNOTATIONS,
     },
@@ -92,7 +92,7 @@ const tools: readonly ToolEntry[] = [
   {
     def: {
       name: 'club_get_my_profile',
-      description: 'Get the authenticated user\'s own profile.',
+      description: 'Get the authenticated user\'s own profile (may include private fields with consent).',
       inputSchema: toJsonSchema(GetMyProfileInputSchema),
       annotations: READ_ONLY_ANNOTATIONS,
     },
@@ -102,7 +102,7 @@ const tools: readonly ToolEntry[] = [
   {
     def: {
       name: 'club_list_spaces',
-      description: 'List visible spaces (pokoje) in Hyper Human Club.',
+      description: 'List visible spaces/pokoje.',
       inputSchema: toJsonSchema(ListSpacesInputSchema),
       annotations: READ_ONLY_ANNOTATIONS,
     },
@@ -112,7 +112,7 @@ const tools: readonly ToolEntry[] = [
   {
     def: {
       name: 'club_list_courses',
-      description: 'List visible courses in Hyper Human Club.',
+      description: 'List visible courses.',
       inputSchema: toJsonSchema(ListCoursesInputSchema),
       annotations: READ_ONLY_ANNOTATIONS,
     },
@@ -122,7 +122,7 @@ const tools: readonly ToolEntry[] = [
   {
     def: {
       name: 'club_get_feed',
-      description: 'Fetch a single visible post or thread by feed id.',
+      description: 'Fetch one visible post/thread by ID.',
       inputSchema: toJsonSchema(GetFeedInputSchema),
       annotations: READ_ONLY_ANNOTATIONS,
     },
@@ -144,7 +144,7 @@ const tools: readonly ToolEntry[] = [
   {
     def: {
       name: 'club_get_user_comments',
-      description: 'List comments authored by a specific user, optionally since a time.',
+      description: 'List comments by a specific user, optionally since a time.',
       inputSchema: toJsonSchema(GetUserCommentsInputSchema),
       annotations: READ_ONLY_ANNOTATIONS,
     },
@@ -180,7 +180,7 @@ const tools: readonly ToolEntry[] = [
   {
     def: {
       name: 'club_get_since_summary',
-      description: 'Aggregate summary of new posts and comments since a given time.',
+      description: 'Convenience aggregation for what is new since a given time.',
       inputSchema: toJsonSchema(GetSinceSummaryInputSchema),
       annotations: READ_ONLY_ANNOTATIONS,
     },
@@ -192,7 +192,7 @@ const tools: readonly ToolEntry[] = [
   {
     def: {
       name: 'club_get_unread_notifications',
-      description: 'Get unread notifications for the authenticated user.',
+      description: 'Get unread notification count and visible unread notification metadata for the authenticated user.',
       inputSchema: toJsonSchema(GetUnreadNotificationsInputSchema),
       annotations: READ_ONLY_ANNOTATIONS,
     },
@@ -207,7 +207,7 @@ const tools: readonly ToolEntry[] = [
   {
     def: {
       name: 'club_search_content',
-      description: 'Search visible posts, comments, and members in Hyper Human Club.',
+      description: 'Search visible posts, comments, and members.',
       inputSchema: toJsonSchema(SearchContentInputSchema),
       annotations: READ_ONLY_ANNOTATIONS,
     },

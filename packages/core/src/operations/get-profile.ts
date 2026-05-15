@@ -6,11 +6,18 @@ import type { AppError } from '../errors.js';
 import { validationError } from '../errors.js';
 import { ProfileResponseSchema, type Profile } from '../schemas/profile.js';
 
-export const GetProfileInputSchema = z.object({
-  username: z.string().min(1).max(100),
-});
+const USERNAME_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
 
-export type GetProfileInput = z.infer<typeof GetProfileInputSchema>;
+export const GetProfileInputSchema = z
+  .object({
+    username: z.string().regex(USERNAME_PATTERN, 'must match ^[A-Za-z0-9_-]{1,80}$'),
+    include_spaces: z.boolean().optional().default(true),
+    include_recent_comments: z.boolean().optional().default(false),
+    limit: z.number().int().positive().max(100).optional().default(20),
+  })
+  .strict();
+
+export type GetProfileInput = z.input<typeof GetProfileInputSchema>;
 
 export interface GetProfileOutput {
   readonly profile: Profile;

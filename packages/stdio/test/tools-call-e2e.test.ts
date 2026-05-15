@@ -139,7 +139,7 @@ describe('tools/call e2e smoke (in-memory transport)', () => {
 
     const response = await harness.client.callTool({
       name: 'club_get_feed',
-      arguments: { feedId: 999 },
+      arguments: { feed_id: 999 },
     });
 
     expect(response.isError).toBe(true);

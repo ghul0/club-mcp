@@ -138,7 +138,7 @@ describe('getUserComments', () => {
     expect(result.value.comments[0]?.xprofile).toBeUndefined();
   });
 
-  it('caps results at maxItems even if upstream has more pages', async () => {
+  it('caps results at limit even if upstream has more pages', async () => {
     const client = buildClient((_path, query) => {
       const page = Number(query?.page ?? 1);
       const start = (page - 1) * 3 + 1;
@@ -150,7 +150,7 @@ describe('getUserComments', () => {
       });
     });
 
-    const result = await getUserComments(client, { username: 'thomas', maxItems: 5 });
+    const result = await getUserComments(client, { username: 'thomas', limit: 5 });
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');

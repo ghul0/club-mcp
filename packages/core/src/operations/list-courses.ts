@@ -6,9 +6,11 @@ import type { AppError } from '../errors.js';
 import { validationError } from '../errors.js';
 import { CoursesResponseSchema, type CourseListItem } from '../schemas/courses.js';
 
-export const ListCoursesInputSchema = z.object({
-  limit: z.number().int().positive().max(200).optional().default(100),
-});
+export const ListCoursesInputSchema = z
+  .object({
+    include_sections: z.boolean().optional().default(true),
+  })
+  .strict();
 
 export type ListCoursesInput = z.input<typeof ListCoursesInputSchema>;
 
@@ -44,11 +46,7 @@ export const listCourses = async (
     return err(validationError(formatIssues(parsed.error)));
   }
 
-  const { limit } = parsed.data;
-
-  const response = await client.get(COURSES_PATH, CoursesResponseSchema, {
-    per_page: limit,
-  });
+  const response = await client.get(COURSES_PATH, CoursesResponseSchema);
 
   if (!response.ok) {
     return err(response.error);

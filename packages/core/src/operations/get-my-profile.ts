@@ -6,15 +6,19 @@ import type { AppError } from '../errors.js';
 import { validationError } from '../errors.js';
 import { ProfileResponseSchema, type Profile } from '../schemas/profile.js';
 
-export const GetMyProfileInputSchema = z.object({
-  consent: z.literal(true, {
-    errorMap: () => ({
-      message: 'consent must be explicitly true to fetch own profile (privacy gate)',
+export const GetMyProfileInputSchema = z
+  .object({
+    consent: z.literal(true, {
+      errorMap: () => ({
+        message: 'consent must be explicitly true to fetch own profile (privacy gate)',
+      }),
     }),
-  }),
-});
+    include_private_fields: z.boolean().optional().default(false),
+    include_spaces: z.boolean().optional().default(true),
+  })
+  .strict();
 
-export type GetMyProfileInput = z.infer<typeof GetMyProfileInputSchema>;
+export type GetMyProfileInput = z.input<typeof GetMyProfileInputSchema>;
 
 export interface GetMyProfileOutput {
   readonly profile: Profile;
