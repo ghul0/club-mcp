@@ -46,7 +46,7 @@ Add an entry under `mcpServers`:
       "command": "npx",
       "args": ["-y", "@hhc-mcp/stdio"],
       "env": {
-        "HHC_BASE_URL": "https://your-club.example.com/wp-json/fluent-community/v2",
+        "HHC_BASE_URL": "https://your-club.example.com",
         "HHC_USER": "your-wordpress-username",
         "HHC_APP_PASS": "xxxx xxxx xxxx xxxx xxxx xxxx"
       }
@@ -60,10 +60,11 @@ App Password from step 1.
 
 Notes:
 
-- `HHC_BASE_URL` must point at the Fluent Community v2 REST root
-  (`/wp-json/fluent-community/v2`), not the bare site root.
+- `HHC_BASE_URL` is the bare site root of your WordPress install (e.g.
+  `https://club.hyperhuman.pl`). The client automatically appends the Fluent
+  Community API path (`/wp-json/fluent-community/v2`) to every request.
 - HTTPS is mandatory. HTTP base URLs are rejected on startup.
-- No trailing slash on the base URL.
+- A trailing slash on the base URL is tolerated but not required.
 
 ## 4. Restart Claude Desktop
 
@@ -108,8 +109,8 @@ should invoke `club_search_members` and return the results.
 - 401 Unauthorized → your App Password is wrong, expired, or your WP user
   lacks read permission on Fluent Community endpoints.
 - "HHC_BASE_URL is not a valid URL" / "baseUrl must use https" → check the
-  base URL format: HTTPS only, no trailing slash, includes the REST path
-  (`/wp-json/fluent-community/v2`).
+  base URL format: HTTPS only, site root domain (no `/wp-json/...` suffix);
+  the client appends the Fluent Community API path for you.
 - No tools appear in Claude Desktop → confirm the JSON file is valid (no
   trailing commas), then fully quit and relaunch Claude Desktop. The MCP
   server is spawned at startup only.
