@@ -62,12 +62,15 @@ describe('basic auth', () => {
   });
 
   it('redactBasicAuth replaces Basic header value with placeholder', () => {
-    const before = 'Authorization: Basic ZmFrZS10ZXN0LXBsYWNlaG9sZGVy';
+    const fakeToken = 'AAAAAAAA';
+    const before = `Authorization: Basic ${fakeToken}`;
     expect(redactBasicAuth(before)).toBe('Authorization: Basic [REDACTED]');
   });
 
   it('redactBasicAuth handles multiple Basic occurrences', () => {
-    const before = 'one Basic abc== two Basic def==';
+    const tokenA = 'AAAA';
+    const tokenB = 'BBBB';
+    const before = `one Basic ${tokenA} two Basic ${tokenB}`;
     expect(redactBasicAuth(before)).toBe('one Basic [REDACTED] two Basic [REDACTED]');
   });
 
