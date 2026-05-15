@@ -24,10 +24,10 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm -r test
-      - run: pnpm build
       - name: pnpm audit (high/critical only)
         run: pnpm -r audit --prod --audit-level high
         continue-on-error: true
