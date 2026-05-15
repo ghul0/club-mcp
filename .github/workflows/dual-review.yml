@@ -1,0 +1,66 @@
+name: dual-review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  reviewer-a:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.0.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: npm install -g '@earendil-works/pi-coding-agent'
+      - name: Run Reviewer-A
+        env:
+          REV_A_BOT_APP_ID: ${{ secrets.REV_A_BOT_APP_ID }}
+          REV_A_BOT_PRIVATE_KEY: ${{ secrets.REV_A_BOT_PRIVATE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          pnpm exec tsx scripts/run-reviewer.ts \
+            --role a \
+            --pr ${{ github.event.pull_request.number }} \
+            --owner ${{ github.repository_owner }} \
+            --repo ${{ github.event.repository.name }}
+
+  reviewer-b:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.0.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: npm install -g '@earendil-works/pi-coding-agent'
+      - name: Run Reviewer-B
+        env:
+          REV_B_BOT_APP_ID: ${{ secrets.REV_B_BOT_APP_ID }}
+          REV_B_BOT_PRIVATE_KEY: ${{ secrets.REV_B_BOT_PRIVATE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          pnpm exec tsx scripts/run-reviewer.ts \
+            --role b \
+            --pr ${{ github.event.pull_request.number }} \
+            --owner ${{ github.repository_owner }} \
+            --repo ${{ github.event.repository.name }}

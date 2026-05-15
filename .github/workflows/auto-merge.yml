@@ -1,0 +1,65 @@
+name: auto-merge
+
+on:
+  pull_request_review:
+    types: [submitted]
+  check_suite:
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: PR number
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+jobs:
+  attempt-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.0.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Resolve PR numbers from event
+        id: prs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_FROM_REVIEW: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.check_suite.head_sha }}
+          INPUT_PR: ${{ github.event.inputs.pr }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request_review" ]; then
+            echo "prs=$PR_FROM_REVIEW" >> "$GITHUB_OUTPUT"
+          elif [ "$EVENT_NAME" = "check_suite" ]; then
+            PRS=$(gh api "repos/$REPO/commits/$HEAD_SHA/pulls" --jq '[.[] | select(.state == "open") | .number] | join(" ")')
+            echo "prs=$PRS" >> "$GITHUB_OUTPUT"
+          else
+            echo "prs=$INPUT_PR" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Attempt merge for each PR
+        if: steps.prs.outputs.prs != ''
+        env:
+          MERGER_APP_ID: ${{ secrets.REV_A_BOT_APP_ID }}
+          MERGER_PRIVATE_KEY: ${{ secrets.REV_A_BOT_PRIVATE_KEY }}
+          OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          set -euo pipefail
+          for pr in ${{ steps.prs.outputs.prs }}; do
+            pnpm exec tsx scripts/run-merger.ts \
+              --pr "$pr" \
+              --owner "$OWNER" \
+              --repo "$REPO_NAME"
+          done
