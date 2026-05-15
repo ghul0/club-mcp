@@ -13,6 +13,6 @@ echo "[pre-push] build"
 pnpm build
 
 echo "[pre-push] audit (high/critical)"
-pnpm -r audit --prod --audit-level high
+pnpm audit --prod --audit-level high
 
 echo "[pre-push] OK"
