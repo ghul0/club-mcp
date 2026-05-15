@@ -1,0 +1,23 @@
+{
+  "name": "club-mcp-workspace",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^22.0.0",
+    "eslint": "^9.0.0",
+    "msw": "^2.7.0",
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.59.3",
+    "vitest": "^3.0.0",
+    "zod": "^3.24.0"
+  }
+}
