@@ -262,16 +262,16 @@ describe('getRecentComments', () => {
     expect(ids).toEqual([7001, 7002]);
   });
 
-  it('stops scanning feeds once an older post is encountered', async () => {
+  it('scans older feeds with new comments (G2: activity-based, not creation-based)', async () => {
     const client = makeClient({
       feedPages: [
         {
           data: [
-            feed(401, '2024-06-15 11:00:00'),
-            feed(402, '2024-06-10 11:00:00'),
-            feed(403, '2024-06-09 11:00:00'),
+            feed(401, '2024-06-15 11:00:00', { last_comment_at: '2024-06-15 11:30:00' }),
+            feed(402, '2024-06-10 11:00:00', { last_comment_at: '2024-06-15 11:31:00' }),
+            feed(403, '2024-05-01 09:00:00', { last_comment_at: '2024-06-15 11:32:00' }),
           ],
-          has_more: true,
+          has_more: false,
         },
       ],
       commentsByFeedId: new Map([
@@ -298,8 +298,117 @@ describe('getRecentComments', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
+    expect(result.value.comments).toHaveLength(3);
+    const ids = result.value.comments.map((c) => c.comment.id).sort((a, b) => a - b);
+    expect(ids).toEqual([6001, 6002, 6003]);
+  });
+
+  it('stops scanning feeds early when last_comment_at falls below since', async () => {
+    const client = makeClient({
+      feedPages: [
+        {
+          data: [
+            feed(411, '2024-06-15 11:00:00', { last_comment_at: '2024-06-15 11:30:00' }),
+            feed(412, '2024-06-01 11:00:00', { last_comment_at: '2024-05-30 12:00:00' }),
+            feed(413, '2024-05-01 09:00:00', { last_comment_at: '2024-06-15 11:40:00' }),
+          ],
+          has_more: false,
+        },
+      ],
+      commentsByFeedId: new Map([
+        [
+          411,
+          [{ data: [comment(6101, 411, '2024-06-15 11:30:00')], has_more: false }],
+        ],
+        [
+          413,
+          [{ data: [comment(6103, 413, '2024-06-15 11:40:00')], has_more: false }],
+        ],
+      ]),
+    });
+
+    const result = await getRecentComments(
+      client,
+      { since: '2024-06-15', scan_feed_limit: 100, comment_per_feed_limit: 50, concurrency: 4 },
+      NOW,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
     expect(result.value.comments).toHaveLength(1);
-    expect(result.value.comments[0]?.comment.id).toBe(6001);
+    expect(result.value.comments[0]?.comment.id).toBe(6101);
+  });
+
+  it('includes edited old comments when include_edits=true', async () => {
+    const client = makeClient({
+      feedPages: [
+        {
+          data: [feed(421, '2024-06-15 11:00:00', { last_comment_at: '2024-06-15 12:00:00' })],
+          has_more: false,
+        },
+      ],
+      commentsByFeedId: new Map([
+        [
+          421,
+          [
+            {
+              data: [
+                { id: 6201, post_id: 421, created_at: '2024-06-14 09:00:00', updated_at: '2024-06-15 12:00:00', message: 'edited' },
+                comment(6202, 421, '2024-06-15 11:30:00'),
+              ],
+              has_more: false,
+            },
+          ],
+        ],
+      ]),
+    });
+
+    const result = await getRecentComments(
+      client,
+      { since: '2024-06-15', include_edits: true, scan_feed_limit: 100, comment_per_feed_limit: 50, concurrency: 4 },
+      NOW,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    const ids = result.value.comments.map((c) => c.comment.id).sort((a, b) => a - b);
+    expect(ids).toEqual([6201, 6202]);
+  });
+
+  it('excludes edited old comments when include_edits=false', async () => {
+    const client = makeClient({
+      feedPages: [
+        {
+          data: [feed(431, '2024-06-15 11:00:00', { last_comment_at: '2024-06-15 12:00:00' })],
+          has_more: false,
+        },
+      ],
+      commentsByFeedId: new Map([
+        [
+          431,
+          [
+            {
+              data: [
+                { id: 6301, post_id: 431, created_at: '2024-06-14 09:00:00', updated_at: '2024-06-15 12:00:00', message: 'edited' },
+                comment(6302, 431, '2024-06-15 11:30:00'),
+              ],
+              has_more: false,
+            },
+          ],
+        ],
+      ]),
+    });
+
+    const result = await getRecentComments(
+      client,
+      { since: '2024-06-15', include_edits: false, scan_feed_limit: 100, comment_per_feed_limit: 50, concurrency: 4 },
+      NOW,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value.comments).toHaveLength(1);
+    expect(result.value.comments[0]?.comment.id).toBe(6302);
   });
 
   it('respects comment_per_feed_limit cap', async () => {

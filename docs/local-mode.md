@@ -63,6 +63,11 @@ Notes:
 - `HHC_BASE_URL` is the bare site root of your WordPress install (e.g.
   `https://club.hyperhuman.pl`). The client automatically appends the Fluent
   Community API path (`/wp-json/fluent-community/v2`) to every request.
+- `HHC_BASE_URL` is required and has no default, even though ADR-007 names
+  `https://club.hyperhuman.pl` as the canonical target. The local stdio mode
+  prefers explicit > implicit to prevent accidental traffic to the wrong club
+  when the variable is unset or misspelled; multi-tenant operators must opt in
+  per deployment.
 - HTTPS is mandatory. HTTP base URLs are rejected on startup.
 - A trailing slash on the base URL is tolerated but not required.
 

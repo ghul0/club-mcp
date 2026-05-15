@@ -92,7 +92,8 @@ for the full tool contracts.
   from `@hhc-mcp/core`.
 - All upstream responses are validated against Zod envelopes; unexpected
   shapes return a typed `AppError` rather than crashing.
-- HTTPS-only upstream in production; HTTP is allowed for local development.
+- HTTPS-only upstream. `HHC_BASE_URL` must use `https://`; the REST client
+  rejects `http://` base URLs at startup (no localhost exception).
 
 ## Architecture
 

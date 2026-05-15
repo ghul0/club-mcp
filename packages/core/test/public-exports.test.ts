@@ -67,6 +67,7 @@ const SCHEMAS: readonly string[] = [
   'NotificationItemSchema',
   'UnreadNotificationsResponseSchema',
   'AppErrorEnvelope',
+  'PublicAppErrorEnvelope',
 ];
 
 const INPUT_SCHEMAS: readonly string[] = [

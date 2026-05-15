@@ -115,4 +115,30 @@ describe('error taxonomy', () => {
 
     expect(envelope.safeParse(malformed).success).toBe(false);
   });
+
+  it('PublicAppErrorEnvelope is exported and accepts a valid AppError without cause', () => {
+    const publicEnvelope = exported.PublicAppErrorEnvelope as AppErrorEnvelopeShape | undefined;
+    expect(publicEnvelope).toBeDefined();
+    expect(typeof publicEnvelope?.safeParse).toBe('function');
+    const valid = getConstructor('validationError')('invalid input', { correlation_id: 'corr-public' });
+    const stripped = {
+      code: valid.code,
+      message: valid.message,
+      retryable: valid.retryable,
+      correlation_id: valid.correlation_id,
+    };
+    expect(publicEnvelope?.safeParse(stripped).success).toBe(true);
+  });
+
+  it('PublicAppErrorEnvelope rejects payloads that carry a cause field', () => {
+    const publicEnvelope = exported.PublicAppErrorEnvelope as AppErrorEnvelopeShape | undefined;
+    expect(publicEnvelope).toBeDefined();
+    const withCause = {
+      code: 'validation',
+      message: 'leaky',
+      retryable: false,
+      cause: new Error('secret internal detail'),
+    };
+    expect(publicEnvelope?.safeParse(withCause).success).toBe(false);
+  });
 });

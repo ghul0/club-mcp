@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { Result } from '../src/result.js';
+import type { AppError } from '../src/errors.js';
 import type { GetClient } from '../src/http/client.js';
 import { err, isErr, isOk, ok } from '../src/result.js';
-import { upstreamUnauthorized } from '../src/errors.js';
+import { upstreamUnauthorized, externalService } from '../src/errors.js';
 import { ProfileResponseSchema } from '../src/schemas/profile.js';
 import { getMyProfile, type GetMyProfileInput } from '../src/operations/get-my-profile.js';
 
@@ -19,21 +21,63 @@ const makeClient = (
 };
 
 describe('getMyProfile', () => {
-  it('returns ok({ profile }) on happy path when consent=true', async () => {
+  it('returns ok({ profile }) on happy path when consent=true and include_spaces=false', async () => {
     const { client, spy } = makeClient(() =>
       Promise.resolve(ok({ profile: sampleProfile })),
     );
 
-    const result = await getMyProfile(client, { consent: true });
+    const result = await getMyProfile(client, { consent: true, include_spaces: false });
 
     expect(isOk(result)).toBe(true);
     if (!isOk(result)) return;
     expect(result.value.profile.user_id).toBe(7);
     expect(result.value.profile.username).toBe('thomas');
+    expect(result.value.spaces).toBeUndefined();
     expect(spy).toHaveBeenCalledTimes(1);
     const args = spy.mock.calls[0];
     expect(args?.[0]).toBe('/profile/me');
     expect(args?.[1]).toBe(ProfileResponseSchema);
+  });
+
+  it('fetches /profile/me/spaces when include_spaces=true (default) and attaches them', async () => {
+    const sampleSpaces = [
+      { id: 10, slug: 'dyskusje', title: 'Dyskusje', privacy: 'public' },
+    ];
+    const spy = vi.fn(async (path: string): Promise<Result<unknown, AppError>> => {
+      if (path === '/profile/me/spaces') {
+        return ok({ spaces: sampleSpaces });
+      }
+      if (path === '/profile/me') {
+        return ok({ profile: sampleProfile });
+      }
+      return err(externalService(`unexpected ${path}`));
+    });
+    const client: GetClient = { get: spy as unknown as GetClient['get'] };
+
+    const result = await getMyProfile(client, { consent: true });
+
+    expect(isOk(result)).toBe(true);
+    if (!isOk(result)) return;
+    expect(result.value.spaces).toHaveLength(1);
+    expect(result.value.spaces?.[0]?.slug).toBe('dyskusje');
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('does NOT fetch spaces when include_spaces=false', async () => {
+    const spy = vi.fn(async (path: string): Promise<Result<unknown, AppError>> => {
+      if (path === '/profile/me/spaces') {
+        return ok({ spaces: [{ slug: 'should-not-appear' }] });
+      }
+      return ok({ profile: sampleProfile });
+    });
+    const client: GetClient = { get: spy as unknown as GetClient['get'] };
+
+    const result = await getMyProfile(client, { consent: true, include_spaces: false });
+
+    expect(isOk(result)).toBe(true);
+    if (!isOk(result)) return;
+    expect(result.value.spaces).toBeUndefined();
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 
   it('returns validation error and does not call client when consent is false', async () => {
@@ -83,11 +127,28 @@ describe('getMyProfile', () => {
     const upstream = upstreamUnauthorized('upstream returned 401');
     const { client } = makeClient(() => Promise.resolve(err(upstream)));
 
-    const result = await getMyProfile(client, { consent: true });
+    const result = await getMyProfile(client, { consent: true, include_spaces: false });
 
     expect(isErr(result)).toBe(true);
     if (!isErr(result)) return;
     expect(result.error.code).toBe('upstream_unauthorized');
     expect(result.error).toBe(upstream);
+  });
+
+  it('propagates upstream error from spaces sub-fetch', async () => {
+    const failure = externalService('spaces-down');
+    const spy = vi.fn(async (path: string): Promise<Result<unknown, AppError>> => {
+      if (path === '/profile/me/spaces') {
+        return err(failure);
+      }
+      return ok({ profile: sampleProfile });
+    });
+    const client: GetClient = { get: spy as unknown as GetClient['get'] };
+
+    const result = await getMyProfile(client, { consent: true });
+
+    expect(isErr(result)).toBe(true);
+    if (!isErr(result)) return;
+    expect(result.error.message).toBe('spaces-down');
   });
 });

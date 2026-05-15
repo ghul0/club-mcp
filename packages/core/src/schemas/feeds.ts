@@ -22,6 +22,7 @@ export const FeedSchema = z.object({
   message_rendered: z.string().nullable().optional(),
   created_at: z.string(),
   updated_at: z.string().nullable().optional(),
+  last_comment_at: z.string().nullable().optional(),
   author: AuthorSchema.optional(),
   space: SpaceSchema.optional(),
   comments_count: z.coerce.number().int().nonnegative().nullable().optional(),

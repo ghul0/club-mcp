@@ -17,7 +17,7 @@ const fixtureFiles = listFixtureFiles();
 
 describe('golden harness (hhc.py oracle)', () => {
   describe('smoke', () => {
-    it('OPERATIONS table exposes the 12 read-only ops', () => {
+    it('OPERATIONS table exposes the 13 read-only ops', () => {
       const names = Object.keys(OPERATIONS).sort();
       expect(names).toEqual(
         [
@@ -27,6 +27,7 @@ describe('golden harness (hhc.py oracle)', () => {
           'get_profile',
           'get_recent_comments',
           'get_recent_posts',
+          'get_since_summary',
           'get_unread_notifications',
           'get_user_comments',
           'list_courses',

@@ -382,4 +382,76 @@ describe('getSinceSummary', () => {
     expect(result.value.posts).toHaveLength(1);
     expect(result.value.comments).toHaveLength(1);
   });
+
+  it('forwards include_edits=true so edited old comments are included in comments slice', async () => {
+    const handle = makeClient({
+      feedPages: [
+        {
+          data: [feed(701, '2024-06-15 11:00:00', { last_comment_at: '2024-06-15 12:00:00' })],
+          has_more: false,
+        },
+      ],
+      commentsByFeedId: new Map([
+        [
+          701,
+          [
+            {
+              data: [
+                { id: 4001, post_id: 701, created_at: '2024-06-14 09:00:00', updated_at: '2024-06-15 12:00:00', message: 'edited' },
+                commentRow(4002, 701, '2024-06-15 11:30:00'),
+              ],
+              has_more: false,
+            },
+          ],
+        ],
+      ]),
+    });
+
+    const result = await getSinceSummary(
+      handle.client,
+      { since: '2024-06-15', limit_posts: 100, limit_comments: 50, include_edits: true },
+      NOW,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    const ids = result.value.comments.map((c) => c.comment.id).sort((a, b) => a - b);
+    expect(ids).toEqual([4001, 4002]);
+  });
+
+  it('forwards include_edits=false so edited old comments are excluded', async () => {
+    const handle = makeClient({
+      feedPages: [
+        {
+          data: [feed(801, '2024-06-15 11:00:00', { last_comment_at: '2024-06-15 12:00:00' })],
+          has_more: false,
+        },
+      ],
+      commentsByFeedId: new Map([
+        [
+          801,
+          [
+            {
+              data: [
+                { id: 5001, post_id: 801, created_at: '2024-06-14 09:00:00', updated_at: '2024-06-15 12:00:00', message: 'edited' },
+                commentRow(5002, 801, '2024-06-15 11:30:00'),
+              ],
+              has_more: false,
+            },
+          ],
+        ],
+      ]),
+    });
+
+    const result = await getSinceSummary(
+      handle.client,
+      { since: '2024-06-15', limit_posts: 100, limit_comments: 50, include_edits: false },
+      NOW,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value.comments).toHaveLength(1);
+    expect(result.value.comments[0]?.comment.id).toBe(5002);
+  });
 });

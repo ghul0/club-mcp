@@ -48,6 +48,17 @@ export const AppErrorEnvelope = z
   })
   .strict();
 
+export const PublicAppErrorEnvelope = z
+  .object({
+    code: ErrorCodeEnvelope,
+    message: z.string(),
+    retryable: z.boolean(),
+    correlation_id: z.string().optional(),
+  })
+  .strict();
+
+export type PublicAppErrorEnvelope = z.infer<typeof PublicAppErrorEnvelope>;
+
 const createAppError = (
   code: ErrorCode,
   message: string,

@@ -17,6 +17,7 @@ import { getUserComments } from '../../src/operations/get-user-comments.js';
 import { getRecentPosts } from '../../src/operations/get-recent-posts.js';
 import { getRecentComments } from '../../src/operations/get-recent-comments.js';
 import { getUnreadNotifications } from '../../src/operations/get-unread-notifications.js';
+import { getSinceSummary } from '../../src/operations/get-since-summary.js';
 
 export type OperationFn = (
   client: GetClient,
@@ -36,6 +37,7 @@ export const OPERATIONS: Readonly<Record<string, OperationFn>> = Object.freeze({
   get_recent_posts: getRecentPosts as unknown as OperationFn,
   get_recent_comments: getRecentComments as unknown as OperationFn,
   get_unread_notifications: getUnreadNotifications as unknown as OperationFn,
+  get_since_summary: getSinceSummary as unknown as OperationFn,
 });
 
 export interface FixtureUpstream {
