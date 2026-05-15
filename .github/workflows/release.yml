@@ -27,12 +27,12 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm lint
       # TODO(v0.1.0): re-enable coverage gate once http package has tests and
       # stdio function coverage reaches the 80% threshold.
       - run: pnpm -r test
-      - run: pnpm build
       - name: Derive version from tag
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
