@@ -7,12 +7,14 @@ import { validationError } from '../errors.js';
 import { getRecentPosts, type GetRecentPostsOutput } from './get-recent-posts.js';
 import { getRecentComments, type GetRecentCommentsOutput } from './get-recent-comments.js';
 
-export const GetSinceSummaryInputSchema = z.object({
-  since: z.string().min(1),
-  maxPosts: z.number().int().positive().max(500).optional().default(100),
-  maxCommentsPerPost: z.number().int().positive().max(200).optional().default(50),
-  concurrency: z.number().int().positive().max(8).optional().default(4),
-});
+export const GetSinceSummaryInputSchema = z
+  .object({
+    since: z.string().min(1).max(40),
+    limit_posts: z.number().int().positive().max(200).optional().default(50),
+    limit_comments: z.number().int().positive().max(200).optional().default(100),
+    include_edits: z.boolean().optional().default(true),
+  })
+  .strict();
 
 export type GetSinceSummaryInput = z.input<typeof GetSinceSummaryInputSchema>;
 type ResolvedInput = z.output<typeof GetSinceSummaryInputSchema>;
@@ -44,14 +46,13 @@ export const getSinceSummary = async (
   const resolved: ResolvedInput = parsed.data;
 
   const [postsResult, commentsResult] = await Promise.all([
-    getRecentPosts(client, { since: resolved.since, maxItems: resolved.maxPosts }, now),
+    getRecentPosts(client, { since: resolved.since, limit: resolved.limit_posts }, now),
     getRecentComments(
       client,
       {
         since: resolved.since,
-        maxPosts: resolved.maxPosts,
-        maxCommentsPerPost: resolved.maxCommentsPerPost,
-        concurrency: resolved.concurrency,
+        limit: resolved.limit_comments,
+        include_edits: resolved.include_edits,
       },
       now,
     ),

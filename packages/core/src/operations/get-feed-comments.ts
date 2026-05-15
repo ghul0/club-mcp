@@ -9,10 +9,12 @@ import { paginate } from '../pagination.js';
 import type { Comment } from '../schemas/comments.js';
 import { CommentsResponseSchema } from '../schemas/comments.js';
 
-export const GetFeedCommentsInputSchema = z.object({
-  feedId: z.union([z.string().min(1), z.number().int().positive()]),
-  maxItems: z.number().int().positive().max(500).optional().default(200),
-});
+export const GetFeedCommentsInputSchema = z
+  .object({
+    feed_id: z.number().int().positive(),
+    limit: z.number().int().positive().max(200).optional().default(100),
+  })
+  .strict();
 
 export type GetFeedCommentsInput = z.input<typeof GetFeedCommentsInputSchema>;
 
@@ -20,7 +22,7 @@ export interface GetFeedCommentsOutput {
   readonly comments: readonly Comment[];
 }
 
-const PER_PAGE = 200;
+const PER_PAGE = 100;
 const MAX_PAGES = 20;
 
 const extractPage = (
@@ -55,8 +57,8 @@ export const getFeedComments = async (
     return err(validationError(message));
   }
 
-  const { feedId, maxItems } = parsed.data;
-  const path = `/feeds/${String(feedId)}/comments`;
+  const { feed_id, limit } = parsed.data;
+  const path = `/feeds/${String(feed_id)}/comments`;
 
   const fetchPage = async (
     req: PageRequest,
@@ -72,7 +74,7 @@ export const getFeedComments = async (
   };
 
   const result = await paginate(fetchPage, {
-    maxItems,
+    maxItems: limit,
     maxPages: MAX_PAGES,
     perPage: PER_PAGE,
   });

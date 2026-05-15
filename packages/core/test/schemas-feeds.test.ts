@@ -129,7 +129,7 @@ describe('feeds schemas', () => {
     expect(parsed.success).toBe(false);
   });
 
-  it('passes through unknown keys on feed envelopes', () => {
+  it('strips unknown keys on feed envelopes (Output DTO allowlist)', () => {
     const parsed = FeedSchema.safeParse({
       id: 99,
       created_at: '2026-05-14 16:31:56',
@@ -142,8 +142,9 @@ describe('feeds schemas', () => {
       throw new Error('expected success');
     }
     const data = parsed.data as Record<string, unknown>;
-    expect(data.custom_meta).toEqual({ foo: 'bar' });
-    expect(data.space_id).toBe(14);
+    expect(data.custom_meta).toBeUndefined();
+    expect(data.space_id).toBeUndefined();
+    expect(data.id).toBe(99);
   });
 
   it('treats nested author and space as optional', () => {

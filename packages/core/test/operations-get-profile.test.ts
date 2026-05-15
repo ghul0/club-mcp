@@ -53,7 +53,7 @@ describe('getProfile', () => {
     expect(args?.[2]).toBeUndefined();
   });
 
-  it('URL-encodes usernames with special characters', async () => {
+  it('rejects usernames with special characters not allowed by the doc pattern', async () => {
     const getMock = vi.fn(() =>
       Promise.resolve(
         ok({
@@ -63,10 +63,12 @@ describe('getProfile', () => {
     );
     const client: GetClient = { get: getMock as unknown as GetClient['get'] };
 
-    await getProfile(client, { username: 'a b/c?' });
+    const result = await getProfile(client, { username: 'a b/c?' });
 
-    const args = getMock.mock.calls[0];
-    expect(args?.[0]).toBe('/profile/a%20b%2Fc%3F');
+    expect(isErr(result)).toBe(true);
+    if (!isErr(result)) return;
+    expect(result.error.code).toBe('validation');
+    expect(getMock).not.toHaveBeenCalled();
   });
 
   it('returns validation error for empty username', async () => {
@@ -82,12 +84,12 @@ describe('getProfile', () => {
     expect(result.error.retryable).toBe(false);
   });
 
-  it('returns validation error when username exceeds 100 chars', async () => {
+  it('returns validation error when username exceeds 80 chars (doc pattern)', async () => {
     const client = makeClient(() => {
       throw new Error('should not be called');
     });
 
-    const result = await getProfile(client, { username: 'a'.repeat(101) });
+    const result = await getProfile(client, { username: 'a'.repeat(81) });
 
     expect(isErr(result)).toBe(true);
     if (!isErr(result)) return;

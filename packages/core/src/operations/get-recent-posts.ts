@@ -8,12 +8,19 @@ import { paginate } from '../pagination.js';
 import type { Feed } from '../schemas/feeds.js';
 import { FeedsListResponseSchema } from '../schemas/feeds.js';
 
-export const GetRecentPostsInputSchema = z.object({
-  since: z.string().min(1),
-  maxItems: z.number().int().positive().max(500).optional().default(200),
-});
+const SPACE_PATTERN = /^[A-Za-z0-9_-]{1,120}$/;
+
+export const GetRecentPostsInputSchema = z
+  .object({
+    since: z.string().min(1).max(40),
+    space: z.string().regex(SPACE_PATTERN, 'must match ^[A-Za-z0-9_-]{1,120}$').optional(),
+    limit: z.number().int().positive().max(200).optional().default(50),
+    scan_feed_limit: z.number().int().positive().max(500).optional().default(300),
+  })
+  .strict();
 
 export type GetRecentPostsInput = z.input<typeof GetRecentPostsInputSchema>;
+type ResolvedInput = z.output<typeof GetRecentPostsInputSchema>;
 
 export interface GetRecentPostsOutput {
   readonly posts: readonly Feed[];
@@ -23,7 +30,7 @@ export interface GetRecentPostsOutput {
 const FEEDS_PATH = '/feeds';
 const DEFAULT_PER_PAGE = 100;
 
-const validateInput = (input: GetRecentPostsInput): Result<{ since: string; maxItems: number }, AppError> => {
+const validateInput = (input: GetRecentPostsInput): Result<ResolvedInput, AppError> => {
   const parsed = GetRecentPostsInputSchema.safeParse(input);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
@@ -35,7 +42,7 @@ const validateInput = (input: GetRecentPostsInput): Result<{ since: string; maxI
       retryable: false,
     });
   }
-  return ok({ since: parsed.data.since, maxItems: parsed.data.maxItems });
+  return ok(parsed.data);
 };
 
 const extractFeeds = (
@@ -70,7 +77,7 @@ export const getRecentPosts = async (
   if (!validated.ok) {
     return err(validated.error);
   }
-  const { since: rawSince, maxItems } = validated.value;
+  const { since: rawSince, limit, scan_feed_limit } = validated.value;
 
   const sinceResult = parseSince(rawSince, now);
   if (!sinceResult.ok) {
@@ -102,7 +109,7 @@ export const getRecentPosts = async (
   };
 
   const paged = await paginate(fetchPage, {
-    maxItems,
+    maxItems: scan_feed_limit,
     perPage: DEFAULT_PER_PAGE,
   });
 
@@ -114,7 +121,7 @@ export const getRecentPosts = async (
   for (const item of paged.value) {
     if (item.created_at >= sinceTimestamp) {
       filtered.push(item);
-      if (filtered.length >= maxItems) {
+      if (filtered.length >= limit) {
         break;
       }
     }

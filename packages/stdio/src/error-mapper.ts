@@ -1,4 +1,4 @@
-import { type Result, type AppError } from '@hhc-mcp/core';
+import { type Result, type AppError, redactKeys } from '@hhc-mcp/core';
 
 export type ToolContent = { readonly type: 'text'; readonly text: string };
 
@@ -43,11 +43,12 @@ export const mapResultToTool = <T>(
     };
   }
   const value = result.value;
+  const sanitized = redactKeys(value);
   const content = successFormatter
-    ? successFormatter(value)
-    : [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }];
+    ? successFormatter(sanitized)
+    : [{ type: 'text' as const, text: JSON.stringify(sanitized, null, 2) }];
   return {
     content,
-    structuredContent: { result: value },
+    structuredContent: { result: sanitized },
   };
 };

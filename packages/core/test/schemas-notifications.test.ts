@@ -66,7 +66,7 @@ describe('NotificationItemSchema', () => {
     expect(parsed.success).toBe(true);
   });
 
-  it('preserves unknown fields via passthrough', () => {
+  it('strips unknown fields (Output DTO allowlist)', () => {
     const parsed = NotificationItemSchema.safeParse({
       ...baseNotification,
       future_field: 'preserved',
@@ -75,8 +75,8 @@ describe('NotificationItemSchema', () => {
     expect(parsed.success).toBe(true);
     if (parsed.success) {
       const data = parsed.data as { readonly future_field?: unknown; readonly is_seen?: unknown };
-      expect(data.future_field).toBe('preserved');
-      expect(data.is_seen).toBe(false);
+      expect(data.future_field).toBeUndefined();
+      expect(data.is_seen).toBeUndefined();
     }
   });
 });
@@ -136,7 +136,7 @@ describe('UnreadNotificationsResponseSchema', () => {
     expect(parsed.success).toBe(false);
   });
 
-  it('preserves unknown top-level fields via passthrough', () => {
+  it('strips unknown top-level fields (Output DTO allowlist)', () => {
     const parsed = UnreadNotificationsResponseSchema.safeParse({
       unread_count: 0,
       notifications: [],
@@ -145,7 +145,7 @@ describe('UnreadNotificationsResponseSchema', () => {
     expect(parsed.success).toBe(true);
     if (parsed.success) {
       const data = parsed.data as { readonly meta?: unknown };
-      expect(data.meta).toEqual({ generated_at: '2026-05-15T00:00:00Z' });
+      expect(data.meta).toBeUndefined();
     }
   });
 });

@@ -129,7 +129,7 @@ describe('getRecentPosts', () => {
     expect(state.calls.length).toBe(0);
   });
 
-  it('respects the maxItems cap', async () => {
+  it('respects the limit cap (post-filter cap)', async () => {
     const pageOne: ReadonlyArray<Feed> = [
       makeFeed(1, '2026-05-15 11:30:00'),
       makeFeed(2, '2026-05-15 11:20:00'),
@@ -152,7 +152,7 @@ describe('getRecentPosts', () => {
 
     const result = await getRecentPosts(
       client,
-      { since: '2026-05-15 00:00:00', maxItems: 4 },
+      { since: '2026-05-15 00:00:00', limit: 4 },
       NOW,
     );
 

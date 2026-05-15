@@ -87,14 +87,14 @@ describe('MembersResponseSchema boundary', () => {
     }
   });
 
-  it('preserves extra unknown top-level fields via passthrough', () => {
+  it('strips extra unknown top-level fields (Output DTO allowlist)', () => {
     const parsed = MembersResponseSchema.parse({
       members: [validMember],
       meta: { generated_at: '2026-05-14T23:00:00Z' },
       unknown_top_level: 123,
     }) as Record<string, unknown>;
-    expect(parsed.meta).toEqual({ generated_at: '2026-05-14T23:00:00Z' });
-    expect(parsed.unknown_top_level).toBe(123);
+    expect(parsed.meta).toBeUndefined();
+    expect(parsed.unknown_top_level).toBeUndefined();
   });
 
   it('accepts an explicit empty array of members but rejects when members key is absent', () => {
@@ -151,17 +151,17 @@ describe('FeedsListResponseSchema boundary', () => {
     }
   });
 
-  it('preserves extra unknown top-level fields via passthrough', () => {
+  it('strips extra unknown top-level fields (Output DTO allowlist)', () => {
     const parsed = FeedsListResponseSchema.parse({
       feeds: [validFeed],
       pagination_info: { cursor: 'abc' },
       experimental_flag: true,
     }) as Record<string, unknown>;
-    expect(parsed.pagination_info).toEqual({ cursor: 'abc' });
-    expect(parsed.experimental_flag).toBe(true);
+    expect(parsed.pagination_info).toBeUndefined();
+    expect(parsed.experimental_flag).toBeUndefined();
   });
 
-  it('preserves extra unknown fields inside the object-form feeds envelope via passthrough', () => {
+  it('strips extra unknown fields inside the object-form feeds envelope', () => {
     const parsed = FeedsListResponseSchema.parse({
       feeds: {
         data: [validFeed],
@@ -172,7 +172,8 @@ describe('FeedsListResponseSchema boundary', () => {
     expect(Array.isArray(parsed.feeds)).toBe(false);
     if (!Array.isArray(parsed.feeds)) {
       const envelope = parsed.feeds as Record<string, unknown>;
-      expect(envelope.cursor).toBe('next-page-token');
+      expect(envelope.cursor).toBeUndefined();
+      expect(envelope.has_more).toBe(false);
     }
   });
 
@@ -222,14 +223,14 @@ describe('FeedByIdResponseSchema boundary', () => {
     }
   });
 
-  it('preserves extra unknown top-level fields via passthrough', () => {
+  it('strips extra unknown top-level fields (Output DTO allowlist)', () => {
     const parsed = FeedByIdResponseSchema.parse({
       feed: validFeed,
       debug_trace_id: 'trace-xyz',
       future_field: { nested: true },
     }) as Record<string, unknown>;
-    expect(parsed.debug_trace_id).toBe('trace-xyz');
-    expect(parsed.future_field).toEqual({ nested: true });
+    expect(parsed.debug_trace_id).toBeUndefined();
+    expect(parsed.future_field).toBeUndefined();
   });
 });
 
@@ -280,17 +281,17 @@ describe('CommentsResponseSchema boundary', () => {
     }
   });
 
-  it('preserves extra unknown top-level fields via passthrough', () => {
+  it('strips extra unknown top-level fields (Output DTO allowlist)', () => {
     const parsed = CommentsResponseSchema.parse({
       comments: [validComment],
       server_time: '2026-05-14T23:59:59Z',
       experiment_bucket: 'A',
     }) as Record<string, unknown>;
-    expect(parsed.server_time).toBe('2026-05-14T23:59:59Z');
-    expect(parsed.experiment_bucket).toBe('A');
+    expect(parsed.server_time).toBeUndefined();
+    expect(parsed.experiment_bucket).toBeUndefined();
   });
 
-  it('preserves extra unknown fields inside the object-form comments envelope via passthrough', () => {
+  it('strips extra unknown fields inside the object-form comments envelope', () => {
     const parsed = CommentsResponseSchema.parse({
       comments: {
         data: [validComment],
@@ -301,7 +302,8 @@ describe('CommentsResponseSchema boundary', () => {
     expect(Array.isArray(parsed.comments)).toBe(false);
     if (!Array.isArray(parsed.comments)) {
       const envelope = parsed.comments as Record<string, unknown>;
-      expect(envelope.cursor).toBe('next-comment-page');
+      expect(envelope.cursor).toBeUndefined();
+      expect(envelope.has_more).toBe(false);
     }
   });
 

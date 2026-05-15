@@ -60,7 +60,7 @@ describe('SpaceListItemSchema', () => {
     expect(parsed.success).toBe(true);
   });
 
-  it('preserves unknown fields via passthrough', () => {
+  it('strips unknown fields (Output DTO allowlist)', () => {
     const parsed = SpaceListItemSchema.safeParse({
       ...baseSpace,
       permissions: { can_create_post: true },
@@ -69,8 +69,8 @@ describe('SpaceListItemSchema', () => {
     expect(parsed.success).toBe(true);
     if (parsed.success) {
       const data = parsed.data as { readonly permissions?: unknown; readonly future_field?: unknown };
-      expect(data.permissions).toEqual({ can_create_post: true });
-      expect(data.future_field).toBe(42);
+      expect(data.permissions).toBeUndefined();
+      expect(data.future_field).toBeUndefined();
     }
   });
 });
@@ -111,7 +111,7 @@ describe('SpacesResponseSchema', () => {
     expect(parsed.success).toBe(false);
   });
 
-  it('preserves unknown top-level fields via passthrough', () => {
+  it('strips unknown top-level fields (Output DTO allowlist)', () => {
     const parsed = SpacesResponseSchema.safeParse({
       spaces: [baseSpace],
       meta: { generated_at: '2026-05-15T00:00:00Z' },
@@ -119,7 +119,7 @@ describe('SpacesResponseSchema', () => {
     expect(parsed.success).toBe(true);
     if (parsed.success) {
       const data = parsed.data as { readonly meta?: unknown };
-      expect(data.meta).toEqual({ generated_at: '2026-05-15T00:00:00Z' });
+      expect(data.meta).toBeUndefined();
     }
   });
 });

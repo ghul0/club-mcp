@@ -6,9 +6,12 @@ import type { AppError } from '../errors.js';
 import { validationError } from '../errors.js';
 import { SpacesResponseSchema, type SpaceListItem } from '../schemas/spaces.js';
 
-export const ListSpacesInputSchema = z.object({
-  limit: z.number().int().positive().max(200).optional().default(100),
-});
+export const ListSpacesInputSchema = z
+  .object({
+    include_members: z.boolean().optional().default(false),
+    member_limit: z.number().int().positive().max(100).optional().default(50),
+  })
+  .strict();
 
 export type ListSpacesInput = z.input<typeof ListSpacesInputSchema>;
 
@@ -42,11 +45,8 @@ export const listSpaces = async (
     return err(validationError(formatIssues(parsed.error)));
   }
 
-  const { limit } = parsed.data;
 
-  const response = await client.get('/spaces/all-spaces', SpacesResponseSchema, {
-    per_page: limit,
-  });
+  const response = await client.get('/spaces/all-spaces', SpacesResponseSchema);
 
   if (!response.ok) {
     return err(response.error);

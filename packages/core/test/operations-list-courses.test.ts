@@ -52,62 +52,52 @@ describe('listCourses', () => {
     expect(result.value.courses[0]?.course.slug).toBe('beta');
   });
 
-  it('calls /courses/all-courses with per_page query param', async () => {
+  it('calls /courses/all-courses with no query params', async () => {
     const getMock = vi.fn(() => Promise.resolve(ok({ courses: [] })));
     const client: GetClient = { get: getMock as unknown as GetClient['get'] };
 
-    await listCourses(client, { limit: 25 });
+    await listCourses(client, { include_sections: false });
 
     expect(getMock).toHaveBeenCalledTimes(1);
     const args = getMock.mock.calls[0];
     expect(args?.[0]).toBe('/courses/all-courses');
     expect(args?.[1]).toBe(CoursesResponseSchema);
-    expect(args?.[2]).toEqual({ per_page: 25 });
+    expect(args?.[2]).toBeUndefined();
   });
 
-  it('defaults limit to 100 when omitted', async () => {
+  it('accepts omitted input and applies defaults', async () => {
     const getMock = vi.fn(() => Promise.resolve(ok({ courses: [] })));
     const client: GetClient = { get: getMock as unknown as GetClient['get'] };
 
-    await listCourses(client);
+    const result = await listCourses(client);
 
-    const args = getMock.mock.calls[0];
-    expect(args?.[2]).toEqual({ per_page: 100 });
+    expect(isOk(result)).toBe(true);
+    expect(getMock).toHaveBeenCalledTimes(1);
   });
 
-  it('defaults limit to 100 when input is empty object', async () => {
+  it('accepts an empty input object and applies defaults', async () => {
     const getMock = vi.fn(() => Promise.resolve(ok({ courses: [] })));
     const client: GetClient = { get: getMock as unknown as GetClient['get'] };
 
-    await listCourses(client, {});
+    const result = await listCourses(client, {});
 
-    const args = getMock.mock.calls[0];
-    expect(args?.[2]).toEqual({ per_page: 100 });
+    expect(isOk(result)).toBe(true);
+    expect(getMock).toHaveBeenCalledTimes(1);
   });
 
-  it('returns validation error when limit exceeds 200', async () => {
+  it('returns validation error when include_sections is not a boolean', async () => {
     const client = makeClient(() => {
       throw new Error('should not be called');
     });
 
-    const result = await listCourses(client, { limit: 201 });
+    const result = await listCourses(client, {
+      include_sections: 'yes' as unknown as boolean,
+    });
 
     expect(isErr(result)).toBe(true);
     if (!isErr(result)) return;
     expect(result.error.code).toBe('validation');
     expect(result.error.retryable).toBe(false);
-  });
-
-  it('returns validation error when limit is zero or negative', async () => {
-    const client = makeClient(() => {
-      throw new Error('should not be called');
-    });
-
-    const result = await listCourses(client, { limit: 0 });
-
-    expect(isErr(result)).toBe(true);
-    if (!isErr(result)) return;
-    expect(result.error.code).toBe('validation');
   });
 
   it('returns ok with empty array when upstream returns empty', async () => {
@@ -141,11 +131,11 @@ describe('listCourses', () => {
     expect(result.error).toBe(upstreamErr);
   });
 
-  it('does not call client when input is invalid', async () => {
+  it('does not call client when input contains an unknown property (strict)', async () => {
     const getMock = vi.fn(() => Promise.resolve(ok({ courses: [] })));
     const client: GetClient = { get: getMock as unknown as GetClient['get'] };
 
-    await listCourses(client, { limit: -1 });
+    await listCourses(client, { limit: -1 } as unknown as Parameters<typeof listCourses>[1]);
 
     expect(getMock).not.toHaveBeenCalled();
   });
