@@ -5,16 +5,36 @@
   "license": "MIT",
   "packageManager": "pnpm@10.0.0",
   "scripts": {
+    "prepare": "husky",
     "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm -r typecheck && pnpm typecheck:scripts",
+    "typecheck:scripts": "tsc -p scripts/tsconfig.json --noEmit",
     "lint": "pnpm -r lint",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "review:local": "tsx scripts/local-review.ts"
+  },
+  "lint-staged": {
+    "packages/**/*.ts": [
+      "pnpm -C packages/core lint --fix || true",
+      "pnpm typecheck"
+    ],
+    "scripts/**/*.ts": [
+      "pnpm typecheck:scripts"
+    ]
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.0.1",
+    "@commitlint/config-conventional": "^21.0.1",
     "@eslint/js": "^9.39.4",
+    "@octokit/auth-app": "^8.2.0",
+    "@octokit/rest": "^22.0.1",
     "@types/node": "^22.0.0",
     "eslint": "^9.0.0",
+    "execa": "^9.6.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.4",
     "msw": "^2.7.0",
+    "tsx": "^4.22.0",
     "typescript": "^5.8.0",
     "typescript-eslint": "^8.59.3",
     "vitest": "^3.0.0",
