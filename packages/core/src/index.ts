@@ -9,3 +9,4 @@ export * from './redaction.js';
 export * from './schemas/members.js';
 export * from './schemas/feeds.js';
 export * from './schemas/comments.js';
+export * from './operations/get-recent-comments.js';
