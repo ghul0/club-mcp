@@ -9,3 +9,6 @@ export * from './redaction.js';
 export * from './schemas/members.js';
 export * from './schemas/feeds.js';
 export * from './schemas/comments.js';
+export * from './schemas/spaces.js';
+export * from './schemas/courses.js';
+export * from './schemas/notifications.js';
