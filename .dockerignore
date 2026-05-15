@@ -1,0 +1,15 @@
+node_modules
+packages/*/node_modules
+dist
+packages/*/dist
+coverage
+.git
+.github
+.env
+.env.*
+!.env.example
+*.log
+.cache
+research
+.playwright-mcp
+.DS_Store

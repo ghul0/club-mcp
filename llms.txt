@@ -1,0 +1,27 @@
+# club-mcp LLM context
+
+This project builds read-only MCP access to Hyper Human Club / Fluent Community REST API.
+
+Core constraints:
+
+- TypeScript-first implementation.
+- pnpm workspace with `@hhc-mcp/core`, `@hhc-mcp/stdio`, `@hhc-mcp/http`.
+- v1 is read-only only.
+- All upstream REST calls are GET-only.
+- No generic REST proxy tool.
+- Each user uses their own WordPress Application Password.
+- Local stdio is privacy-first and recommended.
+- Hosted public mode uses OAuth 2.1 protected resource server plus encrypted WordPress connect flow.
+- Cloudflare Tunnel is origin protection; Cloudflare Access is optional private edge protection, not public MCP auth.
+- Zod validates tool inputs, tool outputs, and upstream REST responses.
+- Upstream JSON starts as unknown.
+- No secrets or content payloads in logs.
+
+Start with:
+
+- docs/stack-decision.md
+- docs/architecture.md
+- docs/variants.md
+- docs/read-only-tools.md
+- docs/security-checklist.md
+- docs/adr/001-typescript-first.md

@@ -1,0 +1,35 @@
+# dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# environment/secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets/
+
+# logs/cache/output
+logs/
+*.log
+.cache/
+dist/
+build/
+coverage/
+.turbo/
+
+# local research captures (public references are in docs/references.md)
+research/
+
+# local auth dumps - never commit
+*storage-state*.json
+*auth*.json
+*cookie*.txt
+*nonce*.txt
