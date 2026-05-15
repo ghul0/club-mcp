@@ -1,0 +1,430 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`tools/list snapshot > produces a stable snapshot of the full tools/list output 1`] = `
+[
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "Search Hyper Human Club members by query string.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "default": 50,
+          "exclusiveMinimum": 0,
+          "maximum": 100,
+          "type": "integer",
+        },
+        "query": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "query",
+      ],
+      "type": "object",
+    },
+    "name": "club_search_members",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "Get the public profile of a Hyper Human Club member by username.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "username": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "username",
+      ],
+      "type": "object",
+    },
+    "name": "club_get_profile",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "Get the authenticated user's own profile.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "consent": {
+          "const": true,
+          "type": "boolean",
+        },
+      },
+      "required": [
+        "consent",
+      ],
+      "type": "object",
+    },
+    "name": "club_get_my_profile",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "List visible spaces (pokoje) in Hyper Human Club.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "default": 100,
+          "exclusiveMinimum": 0,
+          "maximum": 200,
+          "type": "integer",
+        },
+      },
+      "type": "object",
+    },
+    "name": "club_list_spaces",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "List visible courses in Hyper Human Club.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "default": 100,
+          "exclusiveMinimum": 0,
+          "maximum": 200,
+          "type": "integer",
+        },
+      },
+      "type": "object",
+    },
+    "name": "club_list_courses",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "Fetch a single visible post or thread by feed id.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "feedId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string",
+            },
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer",
+            },
+          ],
+        },
+      },
+      "required": [
+        "feedId",
+      ],
+      "type": "object",
+    },
+    "name": "club_get_feed",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "Fetch comments for one visible feed.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "feedId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string",
+            },
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer",
+            },
+          ],
+        },
+        "maxItems": {
+          "default": 200,
+          "exclusiveMinimum": 0,
+          "maximum": 500,
+          "type": "integer",
+        },
+      },
+      "required": [
+        "feedId",
+      ],
+      "type": "object",
+    },
+    "name": "club_get_feed_comments",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "List comments authored by a specific user, optionally since a time.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "maxItems": {
+          "default": 200,
+          "exclusiveMinimum": 0,
+          "maximum": 500,
+          "type": "integer",
+        },
+        "username": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "username",
+      ],
+      "type": "object",
+    },
+    "name": "club_get_user_comments",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "List visible posts created since a given time.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "maxItems": {
+          "default": 200,
+          "exclusiveMinimum": 0,
+          "maximum": 500,
+          "type": "integer",
+        },
+        "since": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "since",
+      ],
+      "type": "object",
+    },
+    "name": "club_get_recent_posts",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "List visible comments created or edited since a given time.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "concurrency": {
+          "default": 4,
+          "exclusiveMinimum": 0,
+          "maximum": 8,
+          "type": "integer",
+        },
+        "maxCommentsPerPost": {
+          "default": 50,
+          "exclusiveMinimum": 0,
+          "maximum": 200,
+          "type": "integer",
+        },
+        "maxPosts": {
+          "default": 100,
+          "exclusiveMinimum": 0,
+          "maximum": 200,
+          "type": "integer",
+        },
+        "since": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "since",
+      ],
+      "type": "object",
+    },
+    "name": "club_get_recent_comments",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "Aggregate summary of new posts and comments since a given time.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "concurrency": {
+          "default": 4,
+          "exclusiveMinimum": 0,
+          "maximum": 8,
+          "type": "integer",
+        },
+        "maxCommentsPerPost": {
+          "default": 50,
+          "exclusiveMinimum": 0,
+          "maximum": 200,
+          "type": "integer",
+        },
+        "maxPosts": {
+          "default": 100,
+          "exclusiveMinimum": 0,
+          "maximum": 500,
+          "type": "integer",
+        },
+        "since": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "since",
+      ],
+      "type": "object",
+    },
+    "name": "club_get_since_summary",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "Get unread notifications for the authenticated user.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "default": 50,
+          "exclusiveMinimum": 0,
+          "maximum": 200,
+          "type": "integer",
+        },
+      },
+      "type": "object",
+    },
+    "name": "club_get_unread_notifications",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "Search visible posts, comments, and members in Hyper Human Club.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "concurrency": {
+          "default": 4,
+          "exclusiveMinimum": 0,
+          "maximum": 8,
+          "type": "integer",
+        },
+        "maxPostsToScanForComments": {
+          "default": 20,
+          "exclusiveMinimum": 0,
+          "maximum": 50,
+          "type": "integer",
+        },
+        "maxResultsPerScope": {
+          "default": 20,
+          "exclusiveMinimum": 0,
+          "maximum": 100,
+          "type": "integer",
+        },
+        "query": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string",
+        },
+        "scopes": {
+          "default": [
+            "members",
+            "posts",
+            "comments",
+          ],
+          "items": {
+            "enum": [
+              "members",
+              "posts",
+              "comments",
+            ],
+            "type": "string",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+      },
+      "required": [
+        "query",
+      ],
+      "type": "object",
+    },
+    "name": "club_search_content",
+  },
+]
+`;
