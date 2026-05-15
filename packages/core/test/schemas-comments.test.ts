@@ -69,13 +69,13 @@ describe('CommentSchema', () => {
     }
   });
 
-  it('passes through unknown fields it does not declare', () => {
+  it('strips unknown fields it does not declare (Output DTO allowlist)', () => {
     const parsed = CommentSchema.safeParse({ ...baseComment, status: 'published', custom_flag: true });
     expect(parsed.success).toBe(true);
     if (parsed.success) {
       const data = parsed.data as { readonly status?: unknown; readonly custom_flag?: unknown };
-      expect(data.status).toBe('published');
-      expect(data.custom_flag).toBe(true);
+      expect(data.status).toBeUndefined();
+      expect(data.custom_flag).toBeUndefined();
     }
   });
 });

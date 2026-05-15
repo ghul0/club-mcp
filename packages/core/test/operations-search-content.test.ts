@@ -86,7 +86,7 @@ describe('searchContent', () => {
     expect(calls.some(([p]) => p === '/feeds')).toBe(true);
   });
 
-  it('runs only the members scope when scopes=["members"]', async () => {
+  it('runs only members when include_members=true and the others=false', async () => {
     const { client, calls } = makeClient((path) => {
       if (path === '/members') {
         return { ok: true, value: { members: [memberFixture(1, 'Alice')] } };
@@ -94,7 +94,12 @@ describe('searchContent', () => {
       throw new Error(`unexpected path: ${path}`);
     });
 
-    const result = await searchContent(client, { query: 'alice', scopes: ['members'] });
+    const result = await searchContent(client, {
+      query: 'alice',
+      include_members: true,
+      include_posts: false,
+      include_comments: false,
+    });
 
     expect(isOk(result)).toBe(true);
     if (!isOk(result)) return;
@@ -114,17 +119,27 @@ describe('searchContent', () => {
     expect(result.error.code).toBe('validation');
   });
 
-  it('returns validationError when scopes is empty', async () => {
+  it('accepts a 200-char query (doc max)', async () => {
+    const { client } = makeClient(() => ({ ok: true, value: { members: [] } }));
+    const result = await searchContent(client, {
+      query: 'a'.repeat(200),
+      include_posts: false,
+      include_comments: false,
+    });
+    expect(isOk(result)).toBe(true);
+  });
+
+  it('rejects a query exceeding 200 chars (doc max)', async () => {
     const { client } = makeClient(() => {
       throw new Error('should not call');
     });
-    const result = await searchContent(client, { query: 'hello', scopes: [] });
+    const result = await searchContent(client, { query: 'a'.repeat(201) });
     expect(isErr(result)).toBe(true);
     if (!isErr(result)) return;
     expect(result.error.code).toBe('validation');
   });
 
-  it('caps members and posts at maxResultsPerScope', async () => {
+  it('caps members and posts at limit', async () => {
     const manyMembers = Array.from({ length: 10 }, (_, i) => memberFixture(i + 1, `User${(i + 1).toString()}`));
     const manyFeeds = Array.from({ length: 10 }, (_, i) => feedFixture(i + 1, `topic ${(i + 1).toString()}`));
     const { client } = makeClient((path) => {
@@ -135,8 +150,8 @@ describe('searchContent', () => {
 
     const result = await searchContent(client, {
       query: 'topic',
-      scopes: ['members', 'posts'],
-      maxResultsPerScope: 3,
+      include_comments: false,
+      limit: 3,
     });
 
     expect(isOk(result)).toBe(true);
@@ -186,8 +201,10 @@ describe('searchContent', () => {
 
     const result = await searchContent(client, {
       query: 'needle',
-      scopes: ['comments'],
-      maxResultsPerScope: 2,
+      include_members: false,
+      include_posts: false,
+      include_comments: true,
+      limit: 2,
     });
 
     expect(isOk(result)).toBe(true);
@@ -214,7 +231,7 @@ describe('searchContent', () => {
 
     const result = await searchContent(client, {
       query: 'x',
-      scopes: ['members', 'posts'],
+      include_comments: false,
     });
 
     expect(isErr(result)).toBe(true);

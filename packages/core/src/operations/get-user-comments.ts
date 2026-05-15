@@ -9,10 +9,15 @@ import { paginate } from '../pagination.js';
 import type { Comment } from '../schemas/comments.js';
 import { CommentsResponseSchema } from '../schemas/comments.js';
 
-export const GetUserCommentsInputSchema = z.object({
-  username: z.string().min(1).max(100),
-  maxItems: z.number().int().positive().max(500).optional().default(200),
-});
+const USERNAME_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
+
+export const GetUserCommentsInputSchema = z
+  .object({
+    username: z.string().regex(USERNAME_PATTERN, 'must match ^[A-Za-z0-9_-]{1,80}$'),
+    since: z.string().min(1).max(40).optional(),
+    limit: z.number().int().positive().max(200).optional().default(100),
+  })
+  .strict();
 
 export type GetUserCommentsInput = z.input<typeof GetUserCommentsInputSchema>;
 
@@ -66,7 +71,7 @@ export const getUserComments = async (
     return err(validationError(message));
   }
 
-  const { username, maxItems } = parsed.data;
+  const { username, limit } = parsed.data;
   const path = `/profile/${encodeURIComponent(username)}/comments`;
 
   const fetchPage = async (
@@ -83,7 +88,7 @@ export const getUserComments = async (
   };
 
   const result = await paginate(fetchPage, {
-    maxItems,
+    maxItems: limit,
     maxPages: MAX_PAGES,
     perPage: PER_PAGE,
   });

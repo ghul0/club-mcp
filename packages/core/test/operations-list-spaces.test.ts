@@ -24,7 +24,7 @@ describe('listSpaces', () => {
       ),
     );
 
-    const result = await listSpaces(client, { limit: 10 });
+    const result = await listSpaces(client, { include_members: false });
 
     expect(isOk(result)).toBe(true);
     if (!isOk(result)) return;
@@ -52,51 +52,51 @@ describe('listSpaces', () => {
     expect(result.value.spaces[0]?.slug).toBe('gamma');
   });
 
-  it('calls /spaces/all-spaces with per_page query param', async () => {
+  it('calls /spaces/all-spaces with no query params', async () => {
     const getMock = vi.fn(() =>
       Promise.resolve(ok({ spaces: [] as Array<{ slug: string }> })),
     );
     const client: GetClient = { get: getMock as unknown as GetClient['get'] };
 
-    await listSpaces(client, { limit: 25 });
+    await listSpaces(client, { include_members: true, member_limit: 25 });
 
     expect(getMock).toHaveBeenCalledTimes(1);
     const args = getMock.mock.calls[0];
     expect(args?.[0]).toBe('/spaces/all-spaces');
     expect(args?.[1]).toBe(SpacesResponseSchema);
-    expect(args?.[2]).toEqual({ per_page: 25 });
+    expect(args?.[2]).toBeUndefined();
   });
 
-  it('defaults limit to 100 when input is omitted', async () => {
+  it('accepts an omitted input and applies defaults', async () => {
     const getMock = vi.fn(() =>
       Promise.resolve(ok({ spaces: [] as Array<{ slug: string }> })),
     );
     const client: GetClient = { get: getMock as unknown as GetClient['get'] };
 
-    await listSpaces(client);
+    const result = await listSpaces(client);
 
-    const args = getMock.mock.calls[0];
-    expect(args?.[2]).toEqual({ per_page: 100 });
+    expect(isOk(result)).toBe(true);
+    expect(getMock).toHaveBeenCalledTimes(1);
   });
 
-  it('defaults limit to 100 when input is provided without limit', async () => {
+  it('accepts an empty input object and applies defaults', async () => {
     const getMock = vi.fn(() =>
       Promise.resolve(ok({ spaces: [] as Array<{ slug: string }> })),
     );
     const client: GetClient = { get: getMock as unknown as GetClient['get'] };
 
-    await listSpaces(client, {});
+    const result = await listSpaces(client, {});
 
-    const args = getMock.mock.calls[0];
-    expect(args?.[2]).toEqual({ per_page: 100 });
+    expect(isOk(result)).toBe(true);
+    expect(getMock).toHaveBeenCalledTimes(1);
   });
 
-  it('returns validation error when limit exceeds 200', async () => {
+  it('returns validation error when member_limit exceeds 100', async () => {
     const client = makeClient(() => {
       throw new Error('should not be called');
     });
 
-    const result = await listSpaces(client, { limit: 201 });
+    const result = await listSpaces(client, { member_limit: 101 });
 
     expect(isErr(result)).toBe(true);
     if (!isErr(result)) return;
@@ -104,12 +104,12 @@ describe('listSpaces', () => {
     expect(result.error.retryable).toBe(false);
   });
 
-  it('returns validation error when limit is zero or negative', async () => {
+  it('returns validation error when member_limit is zero or negative', async () => {
     const client = makeClient(() => {
       throw new Error('should not be called');
     });
 
-    const result = await listSpaces(client, { limit: 0 });
+    const result = await listSpaces(client, { member_limit: 0 });
 
     expect(isErr(result)).toBe(true);
     if (!isErr(result)) return;
@@ -161,7 +161,7 @@ describe('listSpaces', () => {
     );
     const client: GetClient = { get: getMock as unknown as GetClient['get'] };
 
-    await listSpaces(client, { limit: 999 });
+    await listSpaces(client, { member_limit: 999 });
 
     expect(getMock).not.toHaveBeenCalled();
   });

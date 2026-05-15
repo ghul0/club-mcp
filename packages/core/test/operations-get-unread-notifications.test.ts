@@ -35,7 +35,7 @@ describe('getUnreadNotifications', () => {
       ),
     );
 
-    const result = await getUnreadNotifications(client, { limit: 10 });
+    const result = await getUnreadNotifications(client, {});
 
     expect(isOk(result)).toBe(true);
     if (!isOk(result)) return;
@@ -53,7 +53,7 @@ describe('getUnreadNotifications', () => {
       ),
     );
 
-    const result = await getUnreadNotifications(client, { limit: 10 });
+    const result = await getUnreadNotifications(client);
 
     expect(isOk(result)).toBe(true);
     if (!isOk(result)) return;
@@ -61,22 +61,7 @@ describe('getUnreadNotifications', () => {
     expect(result.value.notifications[0]?.id).toBe(501);
   });
 
-  it('calls /notifications/unread with per_page query param', async () => {
-    const getMock = vi.fn(() =>
-      Promise.resolve(ok({ unread_count: 0, notifications: [] as Array<typeof baseNotification> })),
-    );
-    const client: GetClient = { get: getMock as unknown as GetClient['get'] };
-
-    await getUnreadNotifications(client, { limit: 25 });
-
-    expect(getMock).toHaveBeenCalledTimes(1);
-    const args = getMock.mock.calls[0];
-    expect(args?.[0]).toBe('/notifications/unread');
-    expect(args?.[1]).toBe(UnreadNotificationsResponseSchema);
-    expect(args?.[2]).toEqual({ per_page: 25 });
-  });
-
-  it('defaults limit to 50 when omitted', async () => {
+  it('calls /notifications/unread with no query params (doc: empty input)', async () => {
     const getMock = vi.fn(() =>
       Promise.resolve(ok({ unread_count: 0, notifications: [] as Array<typeof baseNotification> })),
     );
@@ -84,11 +69,25 @@ describe('getUnreadNotifications', () => {
 
     await getUnreadNotifications(client);
 
+    expect(getMock).toHaveBeenCalledTimes(1);
     const args = getMock.mock.calls[0];
-    expect(args?.[2]).toEqual({ per_page: 50 });
+    expect(args?.[0]).toBe('/notifications/unread');
+    expect(args?.[1]).toBe(UnreadNotificationsResponseSchema);
+    expect(args?.[2]).toBeUndefined();
   });
 
-  it('defaults limit to 50 when input is empty object', async () => {
+  it('accepts an omitted input', async () => {
+    const getMock = vi.fn(() =>
+      Promise.resolve(ok({ unread_count: 0, notifications: [] as Array<typeof baseNotification> })),
+    );
+    const client: GetClient = { get: getMock as unknown as GetClient['get'] };
+
+    await getUnreadNotifications(client);
+
+    expect(getMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts an empty input object', async () => {
     const getMock = vi.fn(() =>
       Promise.resolve(ok({ unread_count: 0, notifications: [] as Array<typeof baseNotification> })),
     );
@@ -96,16 +95,17 @@ describe('getUnreadNotifications', () => {
 
     await getUnreadNotifications(client, {});
 
-    const args = getMock.mock.calls[0];
-    expect(args?.[2]).toEqual({ per_page: 50 });
+    expect(getMock).toHaveBeenCalledTimes(1);
   });
 
-  it('returns validation error when limit exceeds 200', async () => {
+  it('rejects unknown keys via strict schema', async () => {
     const client = makeClient(() => {
       throw new Error('should not be called');
     });
 
-    const result = await getUnreadNotifications(client, { limit: 201 });
+    const result = await getUnreadNotifications(client, {
+      limit: 10,
+    } as unknown as Parameters<typeof getUnreadNotifications>[1]);
 
     expect(isErr(result)).toBe(true);
     if (!isErr(result)) return;
@@ -113,24 +113,12 @@ describe('getUnreadNotifications', () => {
     expect(result.error.retryable).toBe(false);
   });
 
-  it('returns validation error when limit is zero or negative', async () => {
-    const client = makeClient(() => {
-      throw new Error('should not be called');
-    });
-
-    const result = await getUnreadNotifications(client, { limit: 0 });
-
-    expect(isErr(result)).toBe(true);
-    if (!isErr(result)) return;
-    expect(result.error.code).toBe('validation');
-  });
-
   it('returns ok with empty notifications when upstream returns none', async () => {
     const client = makeClient(() =>
       Promise.resolve(ok({ unread_count: 0, notifications: [] as Array<typeof baseNotification> })),
     );
 
-    const result = await getUnreadNotifications(client, { limit: 50 });
+    const result = await getUnreadNotifications(client);
 
     expect(isOk(result)).toBe(true);
     if (!isOk(result)) return;
@@ -141,22 +129,11 @@ describe('getUnreadNotifications', () => {
     const upstreamErr = upstreamUnauthorized('upstream returned 401');
     const client = makeClient(() => Promise.resolve(err(upstreamErr)));
 
-    const result = await getUnreadNotifications(client, { limit: 10 });
+    const result = await getUnreadNotifications(client);
 
     expect(isErr(result)).toBe(true);
     if (!isErr(result)) return;
     expect(result.error).toBe(upstreamErr);
     expect(result.error.code).toBe('upstream_unauthorized');
-  });
-
-  it('does not call client when input is invalid', async () => {
-    const getMock = vi.fn(() =>
-      Promise.resolve(ok({ unread_count: 0, notifications: [] as Array<typeof baseNotification> })),
-    );
-    const client: GetClient = { get: getMock as unknown as GetClient['get'] };
-
-    await getUnreadNotifications(client, { limit: 500 });
-
-    expect(getMock).not.toHaveBeenCalled();
   });
 });

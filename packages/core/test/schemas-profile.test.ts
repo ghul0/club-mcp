@@ -69,17 +69,28 @@ describe('ProfileSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('allows unknown additional fields via passthrough', () => {
+  it('strips unknown additional fields (Output DTO allowlist)', () => {
     const parsed = ProfileSchema.parse({
       user_id: 1,
       username: 'thomas',
       display_name: 'Thomas',
       future_field: 'preserved',
       meta: { foo: 'bar' },
+      email: 'thomas@example.com',
+      user_email: 'private@example.com',
+      wp_user_id: 12345,
+      app_pass: 'secret-token',
+      user_registered: '2024-01-01',
     }) as Record<string, unknown>;
 
-    expect(parsed.future_field).toBe('preserved');
-    expect(parsed.meta).toEqual({ foo: 'bar' });
+    expect(parsed.future_field).toBeUndefined();
+    expect(parsed.meta).toBeUndefined();
+    expect(parsed.email).toBeUndefined();
+    expect(parsed.user_email).toBeUndefined();
+    expect(parsed.wp_user_id).toBeUndefined();
+    expect(parsed.app_pass).toBeUndefined();
+    expect(parsed.user_registered).toBeUndefined();
+    expect(parsed.user_id).toBe(1);
   });
 
   it('accepts null for nullable optional fields', () => {
@@ -118,7 +129,7 @@ describe('ProfileResponseSchema', () => {
     expect(parsed.profile.username).toBe('thomas');
   });
 
-  it('preserves unknown top-level fields via passthrough', () => {
+  it('strips unknown top-level fields (Output DTO allowlist)', () => {
     const parsed = ProfileResponseSchema.parse({
       profile: {
         user_id: 58,
@@ -128,7 +139,8 @@ describe('ProfileResponseSchema', () => {
       meta: { generated_at: '2026-05-14T23:00:00Z' },
     }) as Record<string, unknown>;
 
-    expect(parsed.meta).toEqual({ generated_at: '2026-05-14T23:00:00Z' });
+    expect(parsed.meta).toBeUndefined();
+    expect((parsed.profile as Record<string, unknown>).user_id).toBe(58);
   });
 
   it('rejects when profile is missing', () => {
@@ -279,7 +291,7 @@ describe('ProfileBundleSchema', () => {
     expect(parsed.xprofile?.username).toBe('thomas');
   });
 
-  it('preserves unknown bundle fields via passthrough', () => {
+  it('strips unknown bundle fields (Output DTO allowlist)', () => {
     const parsed = ProfileBundleSchema.parse({
       profile: {
         user_id: 58,
@@ -291,7 +303,7 @@ describe('ProfileBundleSchema', () => {
       summary: { posts_count_visible: 4 },
     }) as Record<string, unknown>;
 
-    expect(parsed.summary).toEqual({ posts_count_visible: 4 });
+    expect(parsed.summary).toBeUndefined();
   });
 
   it('rejects a bundle missing profile', () => {

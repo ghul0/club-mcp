@@ -135,7 +135,7 @@ describe('getRecentComments', () => {
 
     const result = await getRecentComments(
       client,
-      { since: '2024-06-15', maxPosts: 100, maxCommentsPerPost: 50, concurrency: 4 },
+      { since: '2024-06-15', scan_feed_limit: 100, comment_per_feed_limit: 50, concurrency: 4 },
       NOW,
     );
 
@@ -177,7 +177,7 @@ describe('getRecentComments', () => {
 
     const result = await getRecentComments(
       client,
-      { since: '2024-06-15', maxPosts: 100, maxCommentsPerPost: 50, concurrency: 4 },
+      { since: '2024-06-15', scan_feed_limit: 100, comment_per_feed_limit: 50, concurrency: 4 },
       NOW,
     );
 
@@ -195,7 +195,7 @@ describe('getRecentComments', () => {
 
     const result = await getRecentComments(
       client,
-      { since: 'not-a-date', maxPosts: 100, maxCommentsPerPost: 50, concurrency: 4 },
+      { since: 'not-a-date', scan_feed_limit: 100, comment_per_feed_limit: 50, concurrency: 4 },
       NOW,
     );
 
@@ -212,7 +212,7 @@ describe('getRecentComments', () => {
 
     const result = await getRecentComments(
       client,
-      { since: '', maxPosts: 100, maxCommentsPerPost: 50, concurrency: 4 },
+      { since: '', scan_feed_limit: 100, comment_per_feed_limit: 50, concurrency: 4 },
       NOW,
     );
 
@@ -221,7 +221,7 @@ describe('getRecentComments', () => {
     expect(result.error.code).toBe('validation');
   });
 
-  it('respects maxPosts cap and stops fetching feeds early', async () => {
+  it('respects scan_feed_limit cap and stops fetching feeds early', async () => {
     const client = makeClient({
       feedPages: [
         {
@@ -251,7 +251,7 @@ describe('getRecentComments', () => {
 
     const result = await getRecentComments(
       client,
-      { since: '2024-06-15', maxPosts: 2, maxCommentsPerPost: 50, concurrency: 4 },
+      { since: '2024-06-15', scan_feed_limit: 2, comment_per_feed_limit: 50, concurrency: 4 },
       NOW,
     );
 
@@ -292,7 +292,7 @@ describe('getRecentComments', () => {
 
     const result = await getRecentComments(
       client,
-      { since: '2024-06-15', maxPosts: 100, maxCommentsPerPost: 50, concurrency: 4 },
+      { since: '2024-06-15', scan_feed_limit: 100, comment_per_feed_limit: 50, concurrency: 4 },
       NOW,
     );
 
@@ -302,7 +302,7 @@ describe('getRecentComments', () => {
     expect(result.value.comments[0]?.comment.id).toBe(6001);
   });
 
-  it('respects maxCommentsPerPost cap', async () => {
+  it('respects comment_per_feed_limit cap', async () => {
     const client = makeClient({
       feedPages: [
         {
@@ -333,7 +333,7 @@ describe('getRecentComments', () => {
 
     const result = await getRecentComments(
       client,
-      { since: '2024-06-15', maxPosts: 100, maxCommentsPerPost: 2, concurrency: 4 },
+      { since: '2024-06-15', scan_feed_limit: 100, comment_per_feed_limit: 2, concurrency: 4 },
       NOW,
     );
 
@@ -355,7 +355,7 @@ describe('getRecentComments', () => {
 
     const result = await getRecentComments(
       client,
-      { since: '2024-06-15', maxPosts: 100, maxCommentsPerPost: 50, concurrency: 4 },
+      { since: '2024-06-15', scan_feed_limit: 100, comment_per_feed_limit: 50, concurrency: 4 },
       NOW,
     );
 
@@ -388,7 +388,7 @@ describe('getRecentComments', () => {
 
     const result = await getRecentComments(
       client,
-      { since: '2024-06-15', maxPosts: 100, maxCommentsPerPost: 50, concurrency: 4 },
+      { since: '2024-06-15', scan_feed_limit: 100, comment_per_feed_limit: 50, concurrency: 4 },
       NOW,
     );
 
@@ -410,7 +410,7 @@ describe('getRecentComments', () => {
 
     const result = await getRecentComments(
       client,
-      { since: '2024-06-15', maxPosts: 100, maxCommentsPerPost: 50, concurrency: 4 },
+      { since: '2024-06-15', scan_feed_limit: 100, comment_per_feed_limit: 50, concurrency: 4 },
       NOW,
     );
 
@@ -420,7 +420,7 @@ describe('getRecentComments', () => {
     expect(result.error.message).toBe('feeds-down');
   });
 
-  it('applies defaults for maxPosts, maxCommentsPerPost, and concurrency when omitted', async () => {
+  it('applies defaults for scan_feed_limit, comment_per_feed_limit, and concurrency when omitted', async () => {
     const client = makeClient({
       feedPages: [
         {
