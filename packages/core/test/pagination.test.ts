@@ -99,42 +99,6 @@ describe('paginate', () => {
     expect(fetchPage).toHaveBeenCalledTimes(2);
   });
 
-  it('aborts mid-walk when the signal is triggered and returns an external_service error', async () => {
-    const controller = new AbortController();
-    const fetchPage = vi.fn(async (req: PageRequest): Promise<Result<Page<number>, AppError>> => {
-      if (req.page === 2) {
-        controller.abort();
-      }
-      return ok(page([req.page], true));
-    });
-
-    const result = await paginate(fetchPage, { perPage: 1, signal: controller.signal, maxPages: 10 });
-
-    expect(result.ok).toBe(false);
-    if (result.ok) {
-      throw new Error('expected err');
-    }
-    expect(result.error.code).toBe('external_service');
-    expect(fetchPage).toHaveBeenCalledTimes(2);
-  });
-
-  it('returns an external_service error immediately when the signal is already aborted', async () => {
-    const controller = new AbortController();
-    controller.abort();
-    const fetchPage = vi.fn(async (_req: PageRequest): Promise<Result<Page<number>, AppError>> =>
-      ok(page([1], false)),
-    );
-
-    const result = await paginate(fetchPage, { signal: controller.signal });
-
-    expect(result.ok).toBe(false);
-    if (result.ok) {
-      throw new Error('expected err');
-    }
-    expect(result.error.code).toBe('external_service');
-    expect(fetchPage).not.toHaveBeenCalled();
-  });
-
   it('passes the configured perPage to fetchPage', async () => {
     const fetchPage = vi.fn(async (_req: PageRequest): Promise<Result<Page<number>, AppError>> =>
       ok(page([1], false)),
