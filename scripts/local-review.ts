@@ -12,12 +12,14 @@ const ReviewerSchema = z.object({
 
 type Reviewer = z.infer<typeof ReviewerSchema>;
 
+type Mode = 'staged' | 'branch';
+
 const REVIEWERS: ReadonlyArray<Reviewer> = [
   {
     role: 'a',
     model: 'openai-codex/gpt-5.5',
     focus: [
-      'TDD discipline (tests committed before production code in the diff history).',
+      'TDD discipline (in --staged mode: if production code is staged, matching tests must also be staged; reject impl-without-tests).',
       'Correctness and conformance to AGENTS.md hard rules.',
       'Zod completeness at every external and tool boundary.',
       'ADR-006 read-only invariant; ADR-007 base URL policy; ADR-008 typed errors; ADR-016 error envelope.',
@@ -47,16 +49,28 @@ type ReviewResult = {
   error?: string;
 };
 
-async function getDiff(): Promise<{ base: string; head: string; diff: string }> {
+type DiffContext = { mode: Mode; label: string; diff: string };
+
+function resolveMode(): Mode {
+  return process.argv.includes('--staged') ? 'staged' : 'branch';
+}
+
+async function getDiff(mode: Mode): Promise<DiffContext> {
+  if (mode === 'staged') {
+    const diffProc = await execa('git', ['diff', '--cached'], { reject: false });
+    if (diffProc.exitCode !== 0) {
+      throw new Error(`git diff --cached failed: ${diffProc.stderr}`);
+    }
+    return { mode, label: 'staged-for-commit', diff: diffProc.stdout };
+  }
   const headProc = await execa('git', ['rev-parse', 'HEAD']);
   const head = headProc.stdout.trim();
-
-  const baseRef = await resolveBase();
-  const diffProc = await execa('git', ['diff', `${baseRef}..HEAD`], { reject: false });
+  const base = await resolveBase();
+  const diffProc = await execa('git', ['diff', `${base}..HEAD`], { reject: false });
   if (diffProc.exitCode !== 0) {
     throw new Error(`git diff failed: ${diffProc.stderr}`);
   }
-  return { base: baseRef, head, diff: diffProc.stdout };
+  return { mode, label: `${base}..${head}`, diff: diffProc.stdout };
 }
 
 async function resolveBase(): Promise<string> {
@@ -69,10 +83,13 @@ async function resolveBase(): Promise<string> {
   return 'origin/main';
 }
 
-function buildPrompt(reviewer: Reviewer, base: string, head: string): string {
+function buildPrompt(reviewer: Reviewer, ctx: DiffContext): string {
+  const intro = ctx.mode === 'staged'
+    ? `Reviewing STAGED changes about to be committed. TDD context: if production code is present without matching tests in the same staged set, REQUEST_CHANGES.`
+    : `Reviewing local branch diff: ${ctx.label}`;
   return [
     `You are Reviewer-${reviewer.role.toUpperCase()} for club-mcp.`,
-    `Reviewing local diff: ${base}..${head}`,
+    intro,
     '',
     `Focus axes:`,
     `  - ${reviewer.focus}`,
@@ -94,8 +111,8 @@ function buildPrompt(reviewer: Reviewer, base: string, head: string): string {
   ].join('\n');
 }
 
-async function runReviewer(reviewer: Reviewer, diffPath: string, base: string, head: string): Promise<ReviewResult> {
-  const prompt = buildPrompt(reviewer, base, head);
+async function runReviewer(reviewer: Reviewer, diffPath: string, ctx: DiffContext): Promise<ReviewResult> {
+  const prompt = buildPrompt(reviewer, ctx);
   const result = await execa('pi', ['-p', '--model', reviewer.model, '--no-session', `@${diffPath}`, prompt], {
     reject: false,
     timeout: 600000,
@@ -138,25 +155,30 @@ async function main(): Promise<void> {
     return;
   }
 
-  const { base, head, diff } = await getDiff();
-  if (diff.trim() === '') {
-    process.stderr.write(`No changes between ${base} and ${head} — skipping review\n`);
+  const mode = resolveMode();
+  const ctx = await getDiff(mode);
+  if (ctx.diff.trim() === '') {
+    process.stderr.write(`No ${mode === 'staged' ? 'staged' : 'branch'} changes — skipping review\n`);
     return;
   }
 
   const dir = await mkdtemp(join(tmpdir(), 'hhc-review-'));
   const diffPath = join(dir, 'diff.patch');
-  await writeFile(diffPath, diff, 'utf8');
+  await writeFile(diffPath, ctx.diff, 'utf8');
 
   try {
-    process.stderr.write(`Running dual review on ${base}..${head} (${diff.split('\n').length} diff lines)...\n`);
-    const results = await Promise.all(REVIEWERS.map((r) => runReviewer(r, diffPath, base, head)));
+    process.stderr.write(`Running dual review on ${ctx.label} (${ctx.diff.split('\n').length} diff lines)...\n`);
+    const results = await Promise.all(REVIEWERS.map((r) => runReviewer(r, diffPath, ctx)));
     for (const r of results) printResult(r);
 
     const allApproved = results.every((r) => r.verdict === 'APPROVE');
     if (!allApproved) {
-      process.stderr.write('\n' + ansi('31', 'DUAL REVIEW BLOCKED PUSH') + '\n');
-      process.stderr.write('To override (document reason in PR body): SKIP_LOCAL_REVIEW=1 git push\n');
+      const blockTag = mode === 'staged' ? 'DUAL REVIEW BLOCKED COMMIT' : 'DUAL REVIEW BLOCKED PUSH';
+      const override = mode === 'staged'
+        ? 'To override (document reason in commit body): SKIP_LOCAL_REVIEW=1 git commit'
+        : 'To override (document reason in PR body): SKIP_LOCAL_REVIEW=1 git push';
+      process.stderr.write('\n' + ansi('31', blockTag) + '\n');
+      process.stderr.write(`${override}\n`);
       process.exit(1);
     }
     process.stderr.write('\n' + ansi('32', 'BOTH REVIEWERS APPROVED') + '\n');
