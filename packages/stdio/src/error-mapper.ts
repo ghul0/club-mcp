@@ -1,4 +1,10 @@
-import { type Result, type AppError, redactKeys } from '@hhc-mcp/core';
+import {
+  type Result,
+  type AppError,
+  type PublicAppErrorEnvelope as PublicEnvelopeType,
+  PublicAppErrorEnvelope,
+  redactKeys,
+} from '@hhc-mcp/core';
 
 export type ToolContent = { readonly type: 'text'; readonly text: string };
 
@@ -8,26 +14,31 @@ export type ToolResult = {
   readonly structuredContent?: Readonly<Record<string, unknown>>;
 };
 
-type ErrorEnvelope = {
-  readonly code: AppError['code'];
-  readonly message: string;
-  readonly retryable: boolean;
-  readonly correlation_id?: string;
-};
+const buildErrorEnvelope = (error: AppError): PublicEnvelopeType => {
+  const candidate =
+    error.correlation_id !== undefined
+      ? {
+          code: error.code,
+          message: error.message,
+          retryable: error.retryable,
+          correlation_id: error.correlation_id,
+        }
+      : {
+          code: error.code,
+          message: error.message,
+          retryable: error.retryable,
+        };
 
-const buildErrorEnvelope = (error: AppError): ErrorEnvelope =>
-  error.correlation_id !== undefined
-    ? {
-        code: error.code,
-        message: error.message,
-        retryable: error.retryable,
-        correlation_id: error.correlation_id,
-      }
-    : {
-        code: error.code,
-        message: error.message,
-        retryable: error.retryable,
-      };
+  const parsed = PublicAppErrorEnvelope.safeParse(candidate);
+  if (!parsed.success) {
+    return {
+      code: 'external_service',
+      message: 'internal error envelope validation failed',
+      retryable: false,
+    };
+  }
+  return parsed.data;
+};
 
 export const mapResultToTool = <T>(
   result: Result<T, AppError>,

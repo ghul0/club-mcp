@@ -10,7 +10,7 @@ identifier; do not depend on it from production code yet.
 
 ## Purpose
 
-`@hhc-mcp/http` will host the same 12 read-only tools as `@hhc-mcp/stdio`
+`@hhc-mcp/http` will host the same 13 read-only tools as `@hhc-mcp/stdio`
 behind an OAuth 2.1 protected `/mcp` endpoint, so MCP clients can connect
 without a local install. It composes Hono with `@modelcontextprotocol/sdk`
 and consumes `@hhc-mcp/core` for all REST behavior.
