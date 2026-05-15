@@ -4,7 +4,12 @@ import type { Result } from '../result.js';
 import { err, ok } from '../result.js';
 import type { AppError } from '../errors.js';
 import { validationError } from '../errors.js';
-import { ProfileResponseSchema, type Profile } from '../schemas/profile.js';
+import {
+  ProfileResponseSchema,
+  ProfileSpacesResponseSchema,
+  type Profile,
+  type ProfileSpace,
+} from '../schemas/profile.js';
 
 export const GetMyProfileInputSchema = z
   .object({
@@ -19,12 +24,15 @@ export const GetMyProfileInputSchema = z
   .strict();
 
 export type GetMyProfileInput = z.input<typeof GetMyProfileInputSchema>;
+type ResolvedInput = z.output<typeof GetMyProfileInputSchema>;
 
 export interface GetMyProfileOutput {
   readonly profile: Profile;
+  readonly spaces?: readonly ProfileSpace[];
 }
 
 const ME_PATH = '/profile/me';
+const ME_SPACES_PATH = '/profile/me/spaces';
 
 const formatIssues = (error: z.ZodError): string => {
   const issues = error.issues.slice(0, 3).map((i) => {
@@ -35,6 +43,16 @@ const formatIssues = (error: z.ZodError): string => {
   return `invalid getMyProfile input: ${issues.join('; ')}${suffix}`;
 };
 
+const extractSpaces = (
+  envelope: z.infer<typeof ProfileSpacesResponseSchema>,
+): readonly ProfileSpace[] => {
+  const spaces = envelope.spaces;
+  if (Array.isArray(spaces)) {
+    return spaces;
+  }
+  return spaces.data;
+};
+
 export const getMyProfile = async (
   client: GetClient,
   input: GetMyProfileInput,
@@ -43,11 +61,24 @@ export const getMyProfile = async (
   if (!parsed.success) {
     return err(validationError(formatIssues(parsed.error)));
   }
+  const resolved: ResolvedInput = parsed.data;
 
-  const response = await client.get(ME_PATH, ProfileResponseSchema);
-  if (!response.ok) {
-    return err(response.error);
+  const profileResponse = await client.get(ME_PATH, ProfileResponseSchema);
+  if (!profileResponse.ok) {
+    return err(profileResponse.error);
   }
 
-  return ok({ profile: response.value.profile });
+  if (!resolved.include_spaces) {
+    return ok({ profile: profileResponse.value.profile });
+  }
+
+  const spacesResponse = await client.get(ME_SPACES_PATH, ProfileSpacesResponseSchema);
+  if (!spacesResponse.ok) {
+    return err(spacesResponse.error);
+  }
+
+  return ok({
+    profile: profileResponse.value.profile,
+    spaces: extractSpaces(spacesResponse.value),
+  });
 };

@@ -2,7 +2,7 @@
 
 The Python CLI at `~/.claude/skills/hyperhuman-club/scripts/hhc.py` is
 the behavior reference for `@hhc-mcp/core`. This directory holds a
-fixture-driven harness that proves each of the 12 read-only TypeScript
+fixture-driven harness that proves each of the 13 read-only TypeScript
 operations produces output structurally equivalent to what the Python
 reference returns for the same upstream payload.
 
