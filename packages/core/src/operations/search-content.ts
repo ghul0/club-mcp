@@ -9,20 +9,18 @@ import { MembersResponseSchema, type Member } from '../schemas/members.js';
 import { FeedsListResponseSchema, type Feed } from '../schemas/feeds.js';
 import { CommentsResponseSchema, type Comment } from '../schemas/comments.js';
 
-const ScopeSchema = z.enum(['members', 'posts', 'comments']);
-
-export type SearchContentScope = z.infer<typeof ScopeSchema>;
-
-export const SearchContentInputSchema = z.object({
-  query: z.string().min(1).max(100),
-  scopes: z
-    .array(ScopeSchema)
-    .min(1)
-    .default(['members', 'posts', 'comments']),
-  maxResultsPerScope: z.number().int().positive().max(100).optional().default(20),
-  maxPostsToScanForComments: z.number().int().positive().max(50).optional().default(20),
-  concurrency: z.number().int().positive().max(8).optional().default(4),
-});
+export const SearchContentInputSchema = z
+  .object({
+    query: z.string().min(1).max(200),
+    since: z.string().min(1).max(40).optional(),
+    include_posts: z.boolean().optional().default(true),
+    include_comments: z.boolean().optional().default(true),
+    include_members: z.boolean().optional().default(true),
+    limit: z.number().int().positive().max(100).optional().default(50),
+    scan_feed_limit: z.number().int().positive().max(500).optional().default(300),
+    concurrency: z.number().int().positive().max(8).optional().default(4),
+  })
+  .strict();
 
 export type SearchContentInput = z.input<typeof SearchContentInputSchema>;
 export type SearchContentParsed = z.output<typeof SearchContentInputSchema>;
@@ -78,12 +76,12 @@ const fetchMembers = async (
 ): Promise<Result<readonly Member[], AppError>> => {
   const res = await client.get('/members', MembersResponseSchema, {
     search: input.query,
-    per_page: input.maxResultsPerScope,
+    per_page: input.limit,
   });
   if (!res.ok) {
     return err(res.error);
   }
-  return ok(extractMembers(res.value).slice(0, input.maxResultsPerScope));
+  return ok(extractMembers(res.value).slice(0, input.limit));
 };
 
 const fetchPosts = async (
@@ -92,13 +90,13 @@ const fetchPosts = async (
 ): Promise<Result<readonly Feed[], AppError>> => {
   const res = await client.get('/feeds', FeedsListResponseSchema, {
     search: input.query,
-    per_page: input.maxResultsPerScope,
+    per_page: input.limit,
     order_by_type: 'new_activity',
   });
   if (!res.ok) {
     return err(res.error);
   }
-  return ok(extractFeeds(res.value).slice(0, input.maxResultsPerScope));
+  return ok(extractFeeds(res.value).slice(0, input.limit));
 };
 
 const matchesQuery = (text: string | null | undefined, needle: string): boolean => {
@@ -113,13 +111,13 @@ const fetchCommentsForScope = async (
   input: SearchContentParsed,
 ): Promise<Result<readonly SearchContentCommentHit[], AppError>> => {
   const feedsRes = await client.get('/feeds', FeedsListResponseSchema, {
-    per_page: input.maxPostsToScanForComments,
+    per_page: input.scan_feed_limit,
     order_by_type: 'new_activity',
   });
   if (!feedsRes.ok) {
     return err(feedsRes.error);
   }
-  const feeds = extractFeeds(feedsRes.value).slice(0, input.maxPostsToScanForComments);
+  const feeds = extractFeeds(feedsRes.value).slice(0, input.scan_feed_limit);
   if (feeds.length === 0) {
     return ok([]);
   }
@@ -129,7 +127,7 @@ const fetchCommentsForScope = async (
     async (feed): Promise<Result<readonly SearchContentCommentHit[], AppError>> => {
       const path = `/feeds/${feed.id.toString()}/comments`;
       const res = await client.get(path, CommentsResponseSchema, {
-        per_page: input.maxResultsPerScope,
+        per_page: input.limit,
       });
       if (!res.ok) {
         return err(res.error);
@@ -151,12 +149,12 @@ const fetchCommentsForScope = async (
       return err(result.error);
     }
     for (const hit of result.value) {
-      if (collected.length >= input.maxResultsPerScope) {
+      if (collected.length >= input.limit) {
         break;
       }
       collected.push(hit);
     }
-    if (collected.length >= input.maxResultsPerScope) {
+    if (collected.length >= input.limit) {
       break;
     }
   }
@@ -172,15 +170,14 @@ export const searchContent = async (
     return err(validationError(formatZodIssues(parsed.error)));
   }
   const parameters = parsed.data;
-  const scopeSet = new Set<SearchContentScope>(parameters.scopes);
 
-  const membersPromise: Promise<Result<readonly Member[], AppError>> = scopeSet.has('members')
+  const membersPromise: Promise<Result<readonly Member[], AppError>> = parameters.include_members
     ? fetchMembers(client, parameters)
     : Promise.resolve(ok<readonly Member[]>([]));
-  const postsPromise: Promise<Result<readonly Feed[], AppError>> = scopeSet.has('posts')
+  const postsPromise: Promise<Result<readonly Feed[], AppError>> = parameters.include_posts
     ? fetchPosts(client, parameters)
     : Promise.resolve(ok<readonly Feed[]>([]));
-  const commentsPromise: Promise<Result<readonly SearchContentCommentHit[], AppError>> = scopeSet.has('comments')
+  const commentsPromise: Promise<Result<readonly SearchContentCommentHit[], AppError>> = parameters.include_comments
     ? fetchCommentsForScope(client, parameters)
     : Promise.resolve(ok<readonly SearchContentCommentHit[]>([]));
 

@@ -9,19 +9,19 @@ exports[`tools/list snapshot > produces a stable snapshot of the full tools/list
       "openWorldHint": false,
       "readOnlyHint": true,
     },
-    "description": "Search Hyper Human Club members by query string.",
+    "description": "Find visible members/profiles by search text.",
     "inputSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": false,
       "properties": {
         "limit": {
-          "default": 50,
+          "default": 20,
           "exclusiveMinimum": 0,
           "maximum": 100,
           "type": "integer",
         },
         "query": {
-          "maxLength": 100,
+          "maxLength": 200,
           "minLength": 1,
           "type": "string",
         },
@@ -40,14 +40,27 @@ exports[`tools/list snapshot > produces a stable snapshot of the full tools/list
       "openWorldHint": false,
       "readOnlyHint": true,
     },
-    "description": "Get the public profile of a Hyper Human Club member by username.",
+    "description": "Get visible profile fields for another user.",
     "inputSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": false,
       "properties": {
+        "include_recent_comments": {
+          "default": false,
+          "type": "boolean",
+        },
+        "include_spaces": {
+          "default": true,
+          "type": "boolean",
+        },
+        "limit": {
+          "default": 20,
+          "exclusiveMinimum": 0,
+          "maximum": 100,
+          "type": "integer",
+        },
         "username": {
-          "maxLength": 100,
-          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]{1,80}$",
           "type": "string",
         },
       },
@@ -65,13 +78,21 @@ exports[`tools/list snapshot > produces a stable snapshot of the full tools/list
       "openWorldHint": false,
       "readOnlyHint": true,
     },
-    "description": "Get the authenticated user's own profile.",
+    "description": "Get the authenticated user's own profile (may include private fields with consent).",
     "inputSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": false,
       "properties": {
         "consent": {
           "const": true,
+          "type": "boolean",
+        },
+        "include_private_fields": {
+          "default": false,
+          "type": "boolean",
+        },
+        "include_spaces": {
+          "default": true,
           "type": "boolean",
         },
       },
@@ -89,15 +110,19 @@ exports[`tools/list snapshot > produces a stable snapshot of the full tools/list
       "openWorldHint": false,
       "readOnlyHint": true,
     },
-    "description": "List visible spaces (pokoje) in Hyper Human Club.",
+    "description": "List visible spaces/pokoje.",
     "inputSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": false,
       "properties": {
-        "limit": {
-          "default": 100,
+        "include_members": {
+          "default": false,
+          "type": "boolean",
+        },
+        "member_limit": {
+          "default": 50,
           "exclusiveMinimum": 0,
-          "maximum": 200,
+          "maximum": 100,
           "type": "integer",
         },
       },
@@ -112,16 +137,14 @@ exports[`tools/list snapshot > produces a stable snapshot of the full tools/list
       "openWorldHint": false,
       "readOnlyHint": true,
     },
-    "description": "List visible courses in Hyper Human Club.",
+    "description": "List visible courses.",
     "inputSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": false,
       "properties": {
-        "limit": {
-          "default": 100,
-          "exclusiveMinimum": 0,
-          "maximum": 200,
-          "type": "integer",
+        "include_sections": {
+          "default": true,
+          "type": "boolean",
         },
       },
       "type": "object",
@@ -135,26 +158,28 @@ exports[`tools/list snapshot > produces a stable snapshot of the full tools/list
       "openWorldHint": false,
       "readOnlyHint": true,
     },
-    "description": "Fetch a single visible post or thread by feed id.",
+    "description": "Fetch one visible post/thread by ID.",
     "inputSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": false,
       "properties": {
-        "feedId": {
-          "anyOf": [
-            {
-              "minLength": 1,
-              "type": "string",
-            },
-            {
-              "exclusiveMinimum": 0,
-              "type": "integer",
-            },
-          ],
+        "comment_limit": {
+          "default": 100,
+          "exclusiveMinimum": 0,
+          "maximum": 200,
+          "type": "integer",
+        },
+        "feed_id": {
+          "exclusiveMinimum": 0,
+          "type": "integer",
+        },
+        "include_comments": {
+          "default": true,
+          "type": "boolean",
         },
       },
       "required": [
-        "feedId",
+        "feed_id",
       ],
       "type": "object",
     },
@@ -172,27 +197,19 @@ exports[`tools/list snapshot > produces a stable snapshot of the full tools/list
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": false,
       "properties": {
-        "feedId": {
-          "anyOf": [
-            {
-              "minLength": 1,
-              "type": "string",
-            },
-            {
-              "exclusiveMinimum": 0,
-              "type": "integer",
-            },
-          ],
-        },
-        "maxItems": {
-          "default": 200,
+        "feed_id": {
           "exclusiveMinimum": 0,
-          "maximum": 500,
+          "type": "integer",
+        },
+        "limit": {
+          "default": 100,
+          "exclusiveMinimum": 0,
+          "maximum": 200,
           "type": "integer",
         },
       },
       "required": [
-        "feedId",
+        "feed_id",
       ],
       "type": "object",
     },
@@ -205,20 +222,24 @@ exports[`tools/list snapshot > produces a stable snapshot of the full tools/list
       "openWorldHint": false,
       "readOnlyHint": true,
     },
-    "description": "List comments authored by a specific user, optionally since a time.",
+    "description": "List comments by a specific user, optionally since a time.",
     "inputSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": false,
       "properties": {
-        "maxItems": {
-          "default": 200,
+        "limit": {
+          "default": 100,
           "exclusiveMinimum": 0,
-          "maximum": 500,
+          "maximum": 200,
           "type": "integer",
         },
-        "username": {
-          "maxLength": 100,
+        "since": {
+          "maxLength": 40,
           "minLength": 1,
+          "type": "string",
+        },
+        "username": {
+          "pattern": "^[A-Za-z0-9_-]{1,80}$",
           "type": "string",
         },
       },
@@ -241,14 +262,25 @@ exports[`tools/list snapshot > produces a stable snapshot of the full tools/list
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": false,
       "properties": {
-        "maxItems": {
-          "default": 200,
+        "limit": {
+          "default": 50,
+          "exclusiveMinimum": 0,
+          "maximum": 200,
+          "type": "integer",
+        },
+        "scan_feed_limit": {
+          "default": 300,
           "exclusiveMinimum": 0,
           "maximum": 500,
           "type": "integer",
         },
         "since": {
+          "maxLength": 40,
           "minLength": 1,
+          "type": "string",
+        },
+        "space": {
+          "pattern": "^[A-Za-z0-9_-]{1,120}$",
           "type": "string",
         },
       },
@@ -271,25 +303,36 @@ exports[`tools/list snapshot > produces a stable snapshot of the full tools/list
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": false,
       "properties": {
+        "comment_per_feed_limit": {
+          "default": 100,
+          "exclusiveMinimum": 0,
+          "maximum": 200,
+          "type": "integer",
+        },
         "concurrency": {
           "default": 4,
           "exclusiveMinimum": 0,
           "maximum": 8,
           "type": "integer",
         },
-        "maxCommentsPerPost": {
-          "default": 50,
-          "exclusiveMinimum": 0,
-          "maximum": 200,
-          "type": "integer",
+        "include_edits": {
+          "default": true,
+          "type": "boolean",
         },
-        "maxPosts": {
+        "limit": {
           "default": 100,
           "exclusiveMinimum": 0,
           "maximum": 200,
           "type": "integer",
         },
+        "scan_feed_limit": {
+          "default": 300,
+          "exclusiveMinimum": 0,
+          "maximum": 500,
+          "type": "integer",
+        },
         "since": {
+          "maxLength": 40,
           "minLength": 1,
           "type": "string",
         },
@@ -308,30 +351,29 @@ exports[`tools/list snapshot > produces a stable snapshot of the full tools/list
       "openWorldHint": false,
       "readOnlyHint": true,
     },
-    "description": "Aggregate summary of new posts and comments since a given time.",
+    "description": "Convenience aggregation for what is new since a given time.",
     "inputSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": false,
       "properties": {
-        "concurrency": {
-          "default": 4,
+        "include_edits": {
+          "default": true,
+          "type": "boolean",
+        },
+        "limit_comments": {
+          "default": 100,
           "exclusiveMinimum": 0,
-          "maximum": 8,
+          "maximum": 200,
           "type": "integer",
         },
-        "maxCommentsPerPost": {
+        "limit_posts": {
           "default": 50,
           "exclusiveMinimum": 0,
           "maximum": 200,
           "type": "integer",
         },
-        "maxPosts": {
-          "default": 100,
-          "exclusiveMinimum": 0,
-          "maximum": 500,
-          "type": "integer",
-        },
         "since": {
+          "maxLength": 40,
           "minLength": 1,
           "type": "string",
         },
@@ -350,18 +392,11 @@ exports[`tools/list snapshot > produces a stable snapshot of the full tools/list
       "openWorldHint": false,
       "readOnlyHint": true,
     },
-    "description": "Get unread notifications for the authenticated user.",
+    "description": "Get unread notification count and visible unread notification metadata for the authenticated user.",
     "inputSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": false,
-      "properties": {
-        "limit": {
-          "default": 50,
-          "exclusiveMinimum": 0,
-          "maximum": 200,
-          "type": "integer",
-        },
-      },
+      "properties": {},
       "type": "object",
     },
     "name": "club_get_unread_notifications",
@@ -373,7 +408,7 @@ exports[`tools/list snapshot > produces a stable snapshot of the full tools/list
       "openWorldHint": false,
       "readOnlyHint": true,
     },
-    "description": "Search visible posts, comments, and members in Hyper Human Club.",
+    "description": "Search visible posts, comments, and members.",
     "inputSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": false,
@@ -384,39 +419,39 @@ exports[`tools/list snapshot > produces a stable snapshot of the full tools/list
           "maximum": 8,
           "type": "integer",
         },
-        "maxPostsToScanForComments": {
-          "default": 20,
-          "exclusiveMinimum": 0,
-          "maximum": 50,
-          "type": "integer",
+        "include_comments": {
+          "default": true,
+          "type": "boolean",
         },
-        "maxResultsPerScope": {
-          "default": 20,
+        "include_members": {
+          "default": true,
+          "type": "boolean",
+        },
+        "include_posts": {
+          "default": true,
+          "type": "boolean",
+        },
+        "limit": {
+          "default": 50,
           "exclusiveMinimum": 0,
           "maximum": 100,
           "type": "integer",
         },
         "query": {
-          "maxLength": 100,
+          "maxLength": 200,
           "minLength": 1,
           "type": "string",
         },
-        "scopes": {
-          "default": [
-            "members",
-            "posts",
-            "comments",
-          ],
-          "items": {
-            "enum": [
-              "members",
-              "posts",
-              "comments",
-            ],
-            "type": "string",
-          },
-          "minItems": 1,
-          "type": "array",
+        "scan_feed_limit": {
+          "default": 300,
+          "exclusiveMinimum": 0,
+          "maximum": 500,
+          "type": "integer",
+        },
+        "since": {
+          "maxLength": 40,
+          "minLength": 1,
+          "type": "string",
         },
       },
       "required": [

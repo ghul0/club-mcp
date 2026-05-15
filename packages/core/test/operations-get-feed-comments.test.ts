@@ -55,7 +55,7 @@ describe('getFeedComments', () => {
       });
     });
 
-    const result = await getFeedComments(client, { feedId: 162 });
+    const result = await getFeedComments(client, { feed_id: 162 });
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
@@ -70,7 +70,7 @@ describe('getFeedComments', () => {
       { data: [makeComment(5)], has_more: false },
     ];
     const client = buildClient((path, query) => {
-      if (path !== '/feeds/slug-feed/comments') {
+      if (path !== '/feeds/777/comments') {
         return err(upstreamNotFound('wrong path'));
       }
       const page = Number(query?.page ?? 1) - 1;
@@ -81,7 +81,7 @@ describe('getFeedComments', () => {
       return ok({ comments: data });
     });
 
-    const result = await getFeedComments(client, { feedId: 'slug-feed', maxItems: 10 });
+    const result = await getFeedComments(client, { feed_id: 777, limit: 10 });
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
@@ -89,10 +89,12 @@ describe('getFeedComments', () => {
     expect(client.get).toHaveBeenCalledTimes(3);
   });
 
-  it('rejects an empty feedId with a validation error', async () => {
+  it('rejects a string feed_id with a validation error (doc: integer only)', async () => {
     const client = buildClient(() => ok({ comments: [] }));
 
-    const result = await getFeedComments(client, { feedId: '' });
+    const result = await getFeedComments(client, {
+      feed_id: '' as unknown as number,
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('expected err');
@@ -104,7 +106,7 @@ describe('getFeedComments', () => {
     const failure = upstreamNotFound('feed not found');
     const client = buildClient(() => err(failure));
 
-    const result = await getFeedComments(client, { feedId: 9999 });
+    const result = await getFeedComments(client, { feed_id: 9999 });
 
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('expected err');
@@ -123,7 +125,7 @@ describe('getFeedComments', () => {
       });
     });
 
-    const result = await getFeedComments(client, { feedId: 162, maxItems: 7 });
+    const result = await getFeedComments(client, { feed_id: 162, limit: 7 });
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
@@ -136,7 +138,7 @@ describe('getFeedComments', () => {
       ok({ comments: [makeComment(10), makeComment(11)] }),
     );
 
-    const result = await getFeedComments(client, { feedId: 162, maxItems: 50 });
+    const result = await getFeedComments(client, { feed_id: 162, limit: 50 });
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
@@ -147,7 +149,7 @@ describe('getFeedComments', () => {
   it('rejects a non-positive feedId number with a validation error', async () => {
     const client = buildClient(() => ok({ comments: [] }));
 
-    const result = await getFeedComments(client, { feedId: 0 });
+    const result = await getFeedComments(client, { feed_id: 0 });
 
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('expected err');
