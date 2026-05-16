@@ -66,8 +66,10 @@ jobs:
         run: pnpm --filter @hhc-mcp/stdio publish --access public --provenance --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - name: Generate SBOM (CycloneDX)
-        run: npx --yes @cyclonedx/cyclonedx-npm --output-file sbom.json
+      - name: Generate SBOM (CycloneDX, pnpm-aware via cdxgen)
+        run: npx --yes @cyclonedx/cdxgen@^11 --type pnpm --output sbom.json .
+        env:
+          FETCH_LICENSE: "true"
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
         with:

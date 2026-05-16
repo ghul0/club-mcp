@@ -33,3 +33,6 @@ research/
 *auth*.json
 *cookie*.txt
 *nonce*.txt
+
+# Playwright MCP scratch directory (browser screenshots, eval-result spillover)
+.playwright-mcp/
