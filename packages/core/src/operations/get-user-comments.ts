@@ -7,10 +7,10 @@ import { validationError } from '../errors.js';
 import { parseSince } from '../date.js';
 import type { Comment, PublicComment } from '../schemas/comments.js';
 import {
-  CommentsResponseSchema,
   PublicCommentSchema,
   toPublicComment,
 } from '../schemas/comments.js';
+import { ProfileCommentsResponseSchema, type Profile } from '../schemas/profile.js';
 
 export const GetUserCommentsOutputSchema = z.object({
   comments: z.array(PublicCommentSchema),
@@ -43,14 +43,34 @@ export interface GetUserCommentsOutput {
 const PER_PAGE = 100;
 const MAX_PAGES = 50;
 
-const backfillAuthor = (comment: Comment): Comment => {
+type CommentAuthor = NonNullable<Comment['author']>;
+
+const profileToAuthor = (profile: Profile | undefined): CommentAuthor | undefined => {
+  if (profile === undefined) {
+    return undefined;
+  }
+  const base: CommentAuthor = {
+    user_id: profile.user_id,
+    username: profile.username,
+    display_name: profile.display_name,
+  };
+  if (typeof profile.permalink === 'string') {
+    return { ...base, permalink: profile.permalink };
+  }
+  return base;
+};
+
+const backfillAuthor = (comment: Comment, fallbackAuthor?: CommentAuthor): Comment => {
   if (comment.author !== undefined) {
     return comment;
   }
-  if (comment.xprofile === undefined) {
-    return comment;
+  if (comment.xprofile !== undefined) {
+    return { ...comment, author: comment.xprofile };
   }
-  return { ...comment, author: comment.xprofile };
+  if (fallbackAuthor !== undefined) {
+    return { ...comment, author: fallbackAuthor };
+  }
+  return comment;
 };
 
 interface ExtractedCommentPage {
@@ -59,15 +79,16 @@ interface ExtractedCommentPage {
 }
 
 const extractPage = (
-  envelope: z.infer<typeof CommentsResponseSchema>,
+  envelope: z.infer<typeof ProfileCommentsResponseSchema>,
   perPage: number,
 ): ExtractedCommentPage => {
   const raw = envelope.comments;
+  const fallbackAuthor = profileToAuthor(envelope.xprofile);
   if (Array.isArray(raw)) {
-    const items = raw.map(backfillAuthor);
+    const items = raw.map((c) => backfillAuthor(c, fallbackAuthor));
     return { items, hasMore: items.length >= perPage };
   }
-  const items = raw.data.map(backfillAuthor);
+  const items = raw.data.map((c) => backfillAuthor(c, fallbackAuthor));
   const hasMore = raw.has_more ?? items.length >= perPage;
   return { items, hasMore };
 };
@@ -110,7 +131,7 @@ export const getUserComments = async (
   let limitTruncatedPage = false;
 
   while (currentPage <= MAX_PAGES) {
-    const response = await client.get(path, CommentsResponseSchema, {
+    const response = await client.get(path, ProfileCommentsResponseSchema, {
       page: currentPage,
       per_page: PER_PAGE,
     });

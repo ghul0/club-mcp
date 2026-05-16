@@ -183,7 +183,7 @@ const fetchCommentsForFeed = async (
 
   const collected = await paginate<Comment>(fetchPage, {
     maxItems: maxComments,
-    perPage: COMMENTS_PER_PAGE,
+    perPage: Math.min(maxComments, COMMENTS_PER_PAGE),
     maxPages: 20,
   });
   if (!collected.ok) {

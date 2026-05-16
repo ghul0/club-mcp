@@ -17,7 +17,7 @@ describe('listSpaces', () => {
       Promise.resolve(
         ok({
           spaces: [
-            { id: 1, slug: 'general', title: 'General' },
+            { id: 1, slug: 'general', title: 'General', permissions: { can_create_post: true } },
             { id: 2, slug: 'random', title: 'Random' },
           ],
         }),
@@ -30,6 +30,7 @@ describe('listSpaces', () => {
     if (!isOk(result)) return;
     expect(result.value.spaces).toHaveLength(2);
     expect(result.value.spaces[0]?.slug).toBe('general');
+    expect(result.value.spaces[0]?.permissions).toEqual({ can_create_post: true });
   });
 
   it('returns ok with spaces on object shape ({data: [...]})', async () => {

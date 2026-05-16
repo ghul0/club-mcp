@@ -112,6 +112,22 @@ describe('getUserComments', () => {
     expect(comment?.author?.display_name).toBe(xp.display_name);
   });
 
+  it('backfills author from top-level xprofile when comment-level metadata is missing', async () => {
+    const xp = author('top_level_user');
+    const client = buildClient(() =>
+      ok({
+        comments: { data: [makeComment(11)], has_more: false },
+        xprofile: xp,
+      }),
+    );
+
+    const result = await getUserComments(client, { username: 'top_level_user' });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value.comments[0]?.author?.username).toBe('top_level_user');
+  });
+
   it('leaves comments with an existing author unchanged', async () => {
     const existing = author('real_author');
     const xp = author('xprofile_user');

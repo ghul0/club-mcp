@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { PublicMemberSchema, toPublicMember, type Member, type PublicMember } from './members.js';
 
+const SpacePermissionsSchema = z.record(z.unknown());
+
 export const SpaceListItemSchema = z.object({
   id: z.coerce.number().int().positive().optional(),
   slug: z.string(),
@@ -9,6 +11,7 @@ export const SpaceListItemSchema = z.object({
   privacy: z.string().nullable().optional(),
   members_count: z.coerce.number().int().nonnegative().nullable().optional(),
   permalink: z.string().nullable().optional(),
+  permissions: SpacePermissionsSchema.nullable().optional(),
 });
 
 export const SpacesResponseSchema = z.object({
@@ -30,6 +33,7 @@ export const PublicSpaceSchema = z.object({
   privacy: z.string().nullable().optional(),
   members_count: z.number().int().nonnegative().nullable().optional(),
   permalink: z.string().nullable().optional(),
+  permissions: SpacePermissionsSchema.nullable().optional(),
   members: z.array(PublicMemberSchema).optional(),
 });
 
@@ -47,6 +51,9 @@ export const toPublicSpace = (s: SpaceListItem, members?: readonly Member[]): Pu
     members_count: s.members_count ?? null,
     permalink: s.permalink ?? null,
   };
+  if (s.permissions !== undefined) {
+    out.permissions = s.permissions;
+  }
   if (members !== undefined) {
     const mapped: PublicMember[] = members.map((m) => toPublicMember(m));
     out.members = mapped;

@@ -345,6 +345,37 @@ describe('searchContent', () => {
     }
   });
 
+  it('paginates post search up to scan_feed_limit and sends search_in[]=post_content', async () => {
+    const allFeeds = Array.from({ length: 250 }, (_, i) => feedFixture(i + 1, `topic ${(i + 1).toString()}`));
+    const { client, calls } = makeClient((path, query) => {
+      if (path === '/feeds') {
+        const page = Number(query?.page ?? 1);
+        const perPage = Number(query?.per_page ?? 100);
+        const start = (page - 1) * perPage;
+        return { ok: true, value: { feeds: allFeeds.slice(start, start + perPage) } };
+      }
+      throw new Error(`unexpected: ${path}`);
+    });
+
+    const result = await searchContent(client, {
+      query: 'topic',
+      include_members: false,
+      include_posts: true,
+      include_comments: false,
+      scan_feed_limit: 150,
+      limit: 10,
+    });
+
+    expect(isOk(result)).toBe(true);
+    if (!isOk(result)) return;
+    expect(result.value.results).toHaveLength(10);
+    const feedCalls = calls.filter(([p]) => p === '/feeds');
+    expect(feedCalls).toHaveLength(2);
+    expect(feedCalls[0]?.[2]?.['search_in[]']).toBe('post_content');
+    expect(feedCalls[0]?.[2]?.page).toBe(1);
+    expect(feedCalls[1]?.[2]?.page).toBe(2);
+  });
+
   it('carries feed/post context into comment hits even when include_posts=false (Bucket O)', async () => {
     const { client } = makeClient((path) => {
       if (path === '/feeds') {

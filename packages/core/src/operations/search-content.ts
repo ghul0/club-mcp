@@ -113,12 +113,16 @@ const extractMembers = (raw: z.infer<typeof MembersResponseSchema>): readonly Me
   return members.data;
 };
 
-const extractFeeds = (raw: z.infer<typeof FeedsListResponseSchema>): readonly Feed[] => {
+const extractFeedPage = (
+  raw: z.infer<typeof FeedsListResponseSchema>,
+  perPage: number,
+): { readonly items: readonly Feed[]; readonly hasMore: boolean } => {
   const feeds = raw.feeds;
   if (Array.isArray(feeds)) {
-    return feeds;
+    return { items: feeds, hasMore: feeds.length >= perPage };
   }
-  return feeds.data;
+  const items = feeds.data;
+  return { items, hasMore: feeds.has_more ?? items.length >= perPage };
 };
 
 const extractComments = (raw: z.infer<typeof CommentsResponseSchema>): readonly Comment[] => {
@@ -155,15 +159,27 @@ const fetchPosts = async (
   client: GetClient,
   input: SearchContentParsed,
 ): Promise<Result<readonly Feed[], AppError>> => {
-  const res = await client.get('/feeds', FeedsListResponseSchema, {
-    search: input.query,
-    per_page: UPSTREAM_PER_PAGE,
-    order_by_type: 'new_activity',
+  const fetchFeedPage = async (
+    req: PageRequest,
+  ): Promise<Result<Page<Feed>, AppError>> => {
+    const res = await client.get('/feeds', FeedsListResponseSchema, {
+      search: input.query,
+      'search_in[]': 'post_content',
+      page: req.page,
+      per_page: req.perPage,
+      order_by_type: 'new_activity',
+    });
+    if (!res.ok) {
+      return err(res.error);
+    }
+    const page = extractFeedPage(res.value, req.perPage);
+    return ok({ items: page.items, hasMore: page.hasMore, totalScanned: page.items.length });
+  };
+  return paginate<Feed>(fetchFeedPage, {
+    maxItems: input.scan_feed_limit,
+    perPage: UPSTREAM_PER_PAGE,
+    maxPages: 20,
   });
-  if (!res.ok) {
-    return err(res.error);
-  }
-  return ok(extractFeeds(res.value));
 };
 
 const matchesQuery = (text: string | null | undefined, needle: string): boolean => {
@@ -199,9 +215,8 @@ const fetchFeedsForScan = async (
     if (!res.ok) {
       return err(res.error);
     }
-    const items = extractFeeds(res.value);
-    const hasMore = items.length >= req.perPage;
-    return ok({ items, hasMore, totalScanned: items.length });
+    const page = extractFeedPage(res.value, req.perPage);
+    return ok({ items: page.items, hasMore: page.hasMore, totalScanned: page.items.length });
   };
   return paginate<Feed>(fetchFeedPage, {
     maxItems: scanFeedLimit,

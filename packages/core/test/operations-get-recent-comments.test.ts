@@ -451,6 +451,37 @@ describe('getRecentComments', () => {
     expect(result.value.comments).toHaveLength(2);
   });
 
+  it('uses comment_per_feed_limit as per_page when it is below upstream page max', async () => {
+    const calls: Array<{ readonly path: string; readonly query?: Record<string, string | number | boolean | undefined> }> = [];
+    const get = vi.fn(
+      async (
+        path: string,
+        _schema: unknown,
+        query?: Record<string, string | number | boolean | undefined>,
+      ): Promise<Result<unknown, AppError>> => {
+        calls.push(query === undefined ? { path } : { path, query });
+        if (path === '/feeds') {
+          return ok(feedsResponse({ data: [feed(551, '2024-06-15 11:00:00')], has_more: false }));
+        }
+        if (path === '/feeds/551/comments') {
+          return ok(commentsResponse({ data: [comment(8551, 551, '2024-06-15 11:30:00')], has_more: false }));
+        }
+        return err(externalService(`unexpected path ${path}`));
+      },
+    );
+    const client = { get } as unknown as GetClient;
+
+    const result = await getRecentComments(
+      client,
+      { since: '2024-06-15', scan_feed_limit: 100, comment_per_feed_limit: 25, concurrency: 4 },
+      NOW,
+    );
+
+    expect(result.ok).toBe(true);
+    const commentCall = calls.find((c) => c.path === '/feeds/551/comments');
+    expect(commentCall?.query?.per_page).toBe(25);
+  });
+
   it('returns empty comments when no recent posts exist', async () => {
     const client = makeClient({
       feedPages: [

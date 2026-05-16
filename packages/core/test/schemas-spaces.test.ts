@@ -60,7 +60,7 @@ describe('SpaceListItemSchema', () => {
     expect(parsed.success).toBe(true);
   });
 
-  it('strips unknown fields (Output DTO allowlist)', () => {
+  it('preserves permissions and strips other unknown fields', () => {
     const parsed = SpaceListItemSchema.safeParse({
       ...baseSpace,
       permissions: { can_create_post: true },
@@ -69,7 +69,7 @@ describe('SpaceListItemSchema', () => {
     expect(parsed.success).toBe(true);
     if (parsed.success) {
       const data = parsed.data as { readonly permissions?: unknown; readonly future_field?: unknown };
-      expect(data.permissions).toBeUndefined();
+      expect(data.permissions).toEqual({ can_create_post: true });
       expect(data.future_field).toBeUndefined();
     }
   });

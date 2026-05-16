@@ -41,11 +41,13 @@ import {
   GetSinceSummaryInputSchema,
   GetSinceSummaryOutputSchema,
   externalServiceNonRetryable,
+  redactKeys,
   ok,
   err,
   type Result,
   type AppError,
   type GetClient,
+  type GetMyProfileOutput,
 } from '@hhc-mcp/core';
 import { mapResultToTool, type ToolResult } from './error-mapper.js';
 
@@ -104,6 +106,30 @@ const validateOutput = <T>(
   return ok(parsed.data as T);
 };
 
+const inputRequestsPrivateFields = (input: unknown): boolean => {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+    return false;
+  }
+  return (input as { readonly include_private_fields?: unknown }).include_private_fields === true;
+};
+
+const redactMyProfileOutput = (
+  value: GetMyProfileOutput,
+  preserveEmail: boolean,
+): GetMyProfileOutput => {
+  const sanitized = redactKeys(value);
+  if (!preserveEmail || value.profile.email === undefined) {
+    return sanitized;
+  }
+  return {
+    ...sanitized,
+    profile: {
+      ...sanitized.profile,
+      email: value.profile.email,
+    },
+  };
+};
+
 const tools: readonly ToolEntry[] = [
   {
     def: {
@@ -142,13 +168,17 @@ const tools: readonly ToolEntry[] = [
       inputSchema: toJsonSchema(GetMyProfileInputSchema),
       annotations: READ_ONLY_ANNOTATIONS,
     },
-    handler: async (deps, input) =>
-      mapResultToTool(
+    handler: async (deps, input) => {
+      const preserveEmail = inputRequestsPrivateFields(input);
+      return mapResultToTool(
         validateOutput(
           GetMyProfileOutputSchema,
           await getMyProfile(deps.client, input as z.input<typeof GetMyProfileInputSchema>),
         ),
-      ),
+        undefined,
+        (value) => redactMyProfileOutput(value, preserveEmail),
+      );
+    },
   },
   {
     def: {
