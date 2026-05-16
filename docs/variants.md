@@ -93,27 +93,27 @@ It should still be no-content-storage:
 - no body logs,
 - no owner credentials,
 - no shared bot account,
-- encrypted per-user WordPress Application Password only,
-- minimal metadata logs.
+- no credential storage,
+- per-user WordPress Application Password presented on every request, held only in memory.
 
 ### Auth
 
-MCP-layer auth:
+Hosted public mode uses HTTP Basic Auth pass-through (see [ADR-019](adr/019-hosted-auth-basic-pass-through.md) and `docs/hosted-auth.md`):
 
-- OAuth 2.1 protected resource server,
-- Protected Resource Metadata,
-- bearer token validation on every request,
-- audience/resource validation,
-- least-privilege scopes.
+- every `/mcp` request carries `Authorization: Basic base64(wp_user:wp_app_pass)`,
+- the header is decoded in memory only and never persisted,
+- the same header is forwarded 1:1 to upstream `club.hyperhuman.pl`,
+- no OAuth authorization server, no `/connect` flow, no Protected Resource Metadata.
 
 Edge/origin protection:
 
-- Cloudflare Tunnel recommended,
-- Cloudflare Access optional for private gating, not a substitute for public MCP OAuth.
+- Cloudflare Tunnel publishes the origin; TLS terminates at Cloudflare,
+- Cloudflare WAF + per-IP throttle in front of `/mcp`,
+- Cloudflare Access optional for private/self-hosted gating.
 
 Upstream club auth:
 
-- encrypted per-user WordPress Application Password from connect flow.
+- per-user WordPress Application Password from the same `Authorization` header, forwarded directly.
 
 ## Variant C — self-hosted remote
 
@@ -183,12 +183,11 @@ club_update_profile
 
 ## Build order
 
-1. Build `@hhc-mcp/core`.
-2. Build local `@hhc-mcp/stdio`.
-3. Add keyring support.
-4. Build hosted/self-hosted `@hhc-mcp/http` skeleton.
-5. Add public hosted OAuth.
-6. Add encrypted WordPress connect flow.
-7. Add self-hosted remote docs/examples.
+1. Build `@hhc-mcp/core`. (shipped in v0.0.x)
+2. Build local `@hhc-mcp/stdio`. (shipped in v0.0.x)
+3. Add keyring support. (v0.1.0)
+4. Build hosted `@hhc-mcp/http` with Basic Auth pass-through. (v0.2.0, per ADR-019)
+5. First hosted deployment behind Cloudflare Tunnel. (v0.3.0)
+6. Add self-hosted remote docs/examples. (v0.3.0+, see `docs/self-hosted-remote.md`)
 
-This preserves the privacy-first local path while still enabling hosted and self-hosted remote variants.
+Steps 5 ("public hosted OAuth") and 6 ("encrypted WordPress connect flow") from the original plan are removed per ADR-019. ChatGPT Custom Connector support — the only feature that would require OAuth — is parked until a separate ADR commits to building an OAuth façade.

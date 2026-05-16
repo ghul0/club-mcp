@@ -1,11 +1,13 @@
 # Architecture
 
+> **Hosted auth pivot (2026-05-16).** [ADR-019](adr/019-hosted-auth-basic-pass-through.md) replaced the original hosted OAuth/Keycloak/encrypted-PostgreSQL design with HTTP Basic Auth pass-through and no credential storage. Sections of this document that pre-date ADR-019 are kept for historical context but the "Hosted auth model" and "Remaining product choices" sections below reflect the current decision. Older sections retain references to OAuth/Keycloak/Connect-flow only as a record of what was superseded.
+
 ## Summary
 
 `club-mcp` supports two read-only MCP deployment variants with one shared TypeScript core:
 
 1. **Local stdio MCP** — recommended privacy-first default.
-2. **Hosted/self-hosted Streamable HTTP MCP** — remote connector with OAuth for public hosted mode and optional Cloudflare edge protection.
+2. **Hosted/self-hosted Streamable HTTP MCP** — remote connector authenticated via Basic Auth pass-through (ADR-019), with Cloudflare Tunnel publishing the origin.
 
 ```text
 packages/core   -> @hhc-mcp/core   -> GET-only REST/domain logic
@@ -190,48 +192,17 @@ Every response is treated as `unknown` and validated with Zod before being used 
 
 ## Hosted auth model
 
-### MCP-layer auth
+Current design: HTTP Basic Auth pass-through. Authoritative source: [ADR-019](adr/019-hosted-auth-basic-pass-through.md). Operational details: `docs/hosted-auth.md`.
 
-Hosted public mode follows MCP Authorization:
+The hosted server is a transparent proxy. Each `/mcp` request carries `Authorization: Basic base64(wp_username:wp_app_password)`. `@hhc-mcp/http` decodes the header in memory only and forwards it 1:1 as upstream Basic Auth against `club.hyperhuman.pl`. No credential storage, no OAuth authorization server, no `/connect` redirect flow, no `/.well-known/oauth-protected-resource` document.
 
-- the MCP server is an OAuth 2.1 protected resource server,
-- it publishes Protected Resource Metadata,
-- it returns `WWW-Authenticate` challenges when auth is missing/invalid,
-- it validates bearer tokens on every request,
-- it validates audience/resource binding,
-- it uses least-privilege scopes.
+Cloudflare Tunnel publishes the origin at `hyperhuman-mcp.kingscode.pl`; TLS terminates at Cloudflare. Cloudflare Access remains acceptable for private/self-hosted edge gating.
 
-Cloudflare Tunnel can hide the origin. Cloudflare Access can be used for private/self-hosted mode or additional edge gating, but cannot replace public MCP OAuth for Claude/ChatGPT-style remote connectors.
+If Application Passwords are disabled for a WordPress account or site, the hosted server returns an actionable error (see `docs/hosted-auth.md`). Local stdio mode may use cookie + nonce fallback in restricted scenarios; hosted mode does not.
 
-### Upstream club auth
+### Historical: OAuth + connect flow (superseded by ADR-019)
 
-Each user has their own upstream WordPress Application Password.
-
-Hosted public mode uses an encrypted connect flow:
-
-1. User authorizes MCP server.
-2. User opens `/connect`.
-3. Server redirects to WordPress Application Password authorization endpoint:
-
-```text
-https://club.hyperhuman.pl/wp-admin/authorize-application.php
-```
-
-with:
-
-```text
-app_name=HyperHuman Club MCP
-app_id=<stable UUID for this MCP app>
-success_url=https://mcp.example.com/callback
-reject_url=https://mcp.example.com/connect/rejected
-state=<csrf state tracked by our server>
-```
-
-4. Callback receives `site_url`, `user_login`, `password`.
-5. Server validates state, encrypts app password, and stores the minimum credential record.
-6. Tool calls use that per-user credential.
-
-If Application Passwords are disabled for a WordPress account/site, hosted public mode cannot safely connect that account without adding another site-supported auth method. Local mode may optionally use cookie+nonce fallback.
+The original design (ADRs 002/003/010/011/014) specified an OAuth 2.1 protected resource server backed by Keycloak with an encrypted WordPress Application Password connect flow stored in PostgreSQL using envelope encryption. That stack carried a multi-tenant SaaS shape that the actual deployment target does not warrant. See ADR-019 §Context for the rationale.
 
 ## Package boundaries
 
@@ -303,9 +274,10 @@ Origin hardening:
 Chosen:
 
 - local target: Claude Desktop first, then Claude Code/Pi, with MCP Inspector for debugging,
-- hosted target: MCP Inspector, Claude Custom Connector, ChatGPT remote connector,
-- hosted OAuth provider: Keycloak first,
-- credential storage: PostgreSQL plus application-level envelope encryption,
+- hosted target: MCP Inspector, Claude Desktop Custom Connector, Claude Code, Cursor (ChatGPT explicitly out of scope per ADR-019),
+- hosted auth: HTTP Basic Auth pass-through (ADR-019),
+- hosted credential storage: none,
+- hosted deployment platform: VPS + Docker Compose (one service) + Cloudflare Tunnel (ADR-013, modified by ADR-019),
 - license: MIT.
 
-No architecture-level blockers remain for Phase 1-3. Hosted implementation should follow ADR-013 through ADR-016.
+No architecture-level blockers remain for Phase 1-3. Hosted implementation follows ADR-013, ADR-016, and ADR-019.

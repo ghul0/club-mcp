@@ -49,8 +49,8 @@ License: MIT.
 - No owner cookies/nonces in hosted mode.
 - Per-user upstream auth through WordPress Application Passwords.
 - Local stdio is recommended for maximum privacy.
-- Hosted public mode uses MCP OAuth 2.1 protected resource server behavior with Keycloak first.
-- Cloudflare Tunnel can protect the origin; Cloudflare Access is optional private edge protection, not the public MCP auth model.
+- Hosted public mode uses Basic Auth pass-through (see [ADR-019](docs/adr/019-hosted-auth-basic-pass-through.md)). The server stores no credentials and runs no OAuth authorization server.
+- Cloudflare Tunnel publishes the hosted origin; TLS terminates at Cloudflare.
 
 ## Local stdio direction
 
@@ -82,15 +82,13 @@ Example config:
 ## Hosted public direction
 
 ```text
-MCP client
-  -> OAuth-protected /mcp endpoint
-  -> @hhc-mcp/http
-  -> encrypted per-user WordPress Application Password
+MCP client (with Authorization: Basic header)
+  -> /mcp endpoint on @hhc-mcp/http (behind Cloudflare Tunnel)
   -> @hhc-mcp/core
-  -> club.hyperhuman.pl REST API
+  -> club.hyperhuman.pl REST API (same Basic header forwarded)
 ```
 
-Hosted public mode does process upstream REST responses in memory, but it must not persist club content or log content bodies.
+Hosted public mode holds the WordPress Application Password only in request-scoped memory and forwards it 1:1 to upstream. It persists no credentials and no club content, and never logs argument payloads or response bodies. See [ADR-019](docs/adr/019-hosted-auth-basic-pass-through.md).
 
 ## Folder structure
 

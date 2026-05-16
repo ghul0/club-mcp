@@ -1,6 +1,6 @@
 # ADR-014: Key management for hosted credentials
 
-Status: accepted
+Status: superseded by [ADR-019](019-hosted-auth-basic-pass-through.md)
 
 ## Context
 

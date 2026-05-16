@@ -11,29 +11,35 @@ identifier; do not depend on it from production code yet.
 ## Purpose
 
 `@hhc-mcp/http` will host the same 13 read-only tools as `@hhc-mcp/stdio`
-behind an OAuth 2.1 protected `/mcp` endpoint, so MCP clients can connect
-without a local install. It composes Hono with `@modelcontextprotocol/sdk`
-and consumes `@hhc-mcp/core` for all REST behavior.
+behind a `/mcp` endpoint authenticated with HTTP Basic Auth pass-through,
+so MCP clients can connect without a local install. It composes Hono with
+`@modelcontextprotocol/sdk` and consumes `@hhc-mcp/core` for all REST behavior.
 
 ## Planned endpoints
 
-- `POST /mcp` — Streamable HTTP MCP transport, protected by OAuth 2.1.
+- `POST /mcp` — Streamable HTTP MCP transport. Requires
+  `Authorization: Basic base64(wp_user:wp_app_pass)` on every request.
+  The header is decoded in memory only and forwarded 1:1 to the upstream
+  WordPress REST API.
 - `GET /healthz` — liveness probe.
-- `GET /.well-known/oauth-protected-resource` — RFC 9728 protected-resource
-  metadata pointing at the configured authorization server.
+
+There is no `/.well-known/oauth-protected-resource`, no `/connect`, no
+`/callback`, no `/disconnect`, and no credential storage.
 
 ## Design references
 
-- `docs/adr/002-hosted-auth-oauth-resource-server.md` — OAuth resource-server
-  posture.
-- `docs/adr/003-hosted-credential-connect-flow.md` — connect-flow that turns a
-  WordPress Application Password into an encrypted per-user credential.
-- `docs/adr/010-hosted-oauth-provider.md`,
-  `docs/adr/011-credential-storage.md`,
-  `docs/adr/013-hosted-deployment-platform.md`,
-  `docs/adr/014-key-management.md` — platform, storage, and key-management.
-- `docs/hosted-auth.md` — narrative description of the hosted auth flow.
+- `docs/adr/019-hosted-auth-basic-pass-through.md` — authoritative hosted
+  auth design.
+- `docs/adr/013-hosted-deployment-platform.md` — VPS + Docker Compose +
+  Cloudflare Tunnel.
+- `docs/adr/007-base-url-policy.md` — single-base-URL policy.
+- `docs/adr/008-error-model.md`, `docs/adr/016-mcp-error-envelope.md` —
+  error semantics on the wire.
+- `docs/hosted-auth.md` — operational narrative.
 - `ROADMAP.md` — phase-by-phase build plan.
+- Superseded: ADRs 002, 003, 010, 011, 014 (previous OAuth + Keycloak +
+  encrypted-PostgreSQL design; kept in the repository for historical
+  context per ADR-017).
 
 ## Boundaries (ADR-004)
 

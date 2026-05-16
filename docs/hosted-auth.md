@@ -1,124 +1,110 @@
 # Hosted authentication design
 
-Hosted public MCP has two independent auth layers. The first hosted OAuth provider is Keycloak.
+Authoritative source: [ADR-019](adr/019-hosted-auth-basic-pass-through.md). This document explains the operational shape.
+
+Hosted public MCP uses Basic Auth pass-through. The server is a transparent proxy: the user holds the secret, the server holds it in memory only for the duration of one request.
 
 ```text
-MCP client -> @hhc-mcp/http       OAuth 2.1 bearer token for MCP server
-@hhc-mcp/http -> WordPress REST   per-user WordPress Application Password
+MCP client → @hhc-mcp/http                Authorization: Basic base64(wp_user:wp_app_pass)
+@hhc-mcp/http → club.hyperhuman.pl/wp-json  same Basic header, forwarded 1:1
 ```
 
-## MCP-layer auth for public hosted mode
+There is no OAuth server, no Keycloak, no PostgreSQL credential store, no key-encryption key. The original design (ADR-002/003/010/011/014) was superseded.
 
-Public hosted mode implements MCP Authorization with Keycloak as the first authorization server.
+## Wire format
 
-Required behavior:
+Every `/mcp` request MUST carry:
 
-- serve `/.well-known/oauth-protected-resource`,
-- return `WWW-Authenticate: Bearer ... resource_metadata=...` on 401,
-- require `Authorization: Bearer <token>` on every `/mcp` request,
-- validate token issuer/signature/expiry/audience/resource,
-- reject tokens not issued for this MCP server,
-- never forward MCP bearer tokens to WordPress,
-- use least-privilege scopes.
-
-## Cloudflare role
-
-Cloudflare can still be useful:
-
-- Cloudflare Tunnel hides origin.
-- Cloudflare WAF can reduce generic abuse.
-- Cloudflare Access can protect private/self-hosted deployments.
-
-Cloudflare Access alone is not the public MCP auth model for Claude/ChatGPT-style remote connectors.
-
-## WordPress Application Password connect flow
-
-Discovery:
-
-```text
-GET https://club.hyperhuman.pl/wp-json/
+```http
+Authorization: Basic <base64(wp_username:wp_app_password)>
 ```
 
-Expected field:
+Where `wp_username` is the WordPress user login on `club.hyperhuman.pl` and `wp_app_password` is a WordPress Application Password created via that user's profile.
 
-```text
-authentication.application-passwords.endpoints.authorization
-```
+The server:
 
-Authorization URL parameters:
+- decodes the header on each request,
+- holds `(user, pass)` in request-scoped memory only,
+- forwards the same `Authorization: Basic ...` header to the upstream WordPress REST API,
+- never logs the raw header, the password, or tool arguments,
+- never persists either value to disk.
 
-```text
-app_name     required, human-readable app name
-app_id       stable UUID for this MCP app
-success_url  HTTPS callback endpoint
-reject_url   HTTPS reject endpoint
-state        our CSRF binding, tracked server-side or encrypted cookie
-```
+## Error responses
 
-Callback query from WordPress:
+| Condition | Status | Body | Notes |
+|---|---|---|---|
+| Missing `Authorization` header | `401` | text describing required header | No `WWW-Authenticate: Basic` (avoids browser prompts on accidental visits). |
+| Malformed header / non-Basic scheme | `401` | text describing required format | Same as above. |
+| Decoded credentials rejected upstream by WordPress | mapped to MCP error envelope per [ADR-016](adr/016-mcp-error-envelope.md), `error.code = "auth"` | actionable message | Server does not retry with different credentials. |
+| Decoded credentials valid but upstream forbids the resource | mapped to MCP error envelope, `error.code = "forbidden"` | actionable message | Application Password capabilities are WordPress-side. |
 
-```text
-site_url
-user_login
-password
-```
+## TLS and edge
 
-Handling requirements:
+The first hosted deployment runs behind Cloudflare:
 
-- never log callback query,
-- validate `state`,
-- validate `site_url` against allowed base URL,
-- immediately encrypt `password`,
-- store minimal credential metadata,
-- test credential with a safe read-only request,
-- show success without printing secret.
+- TLS terminates at Cloudflare (`hyperhuman-mcp.kingscode.pl`).
+- Cloudflare Tunnel reaches the origin `@hhc-mcp/http` process. No public origin port.
+- WAF and per-IP throttle are configured at Cloudflare.
+
+Cloudflare Access is not used to gate `/mcp` for public clients; the bearer of a valid WordPress Application Password is the authenticated principal. Cloudflare Access is acceptable for private/self-hosted variants per ADR-019 §6.
+
+## Audit log
+
+If enabled, audit log records:
+
+- `wp_username` (decoded from the header; PII, not a secret),
+- request timestamp,
+- tool name,
+- HTTP status returned to the MCP client,
+- `correlation_id` per ADR-008.
+
+It MUST NOT record:
+
+- the password,
+- the raw `Authorization` header,
+- tool argument payloads,
+- upstream response bodies.
+
+## Revocation
+
+A user revokes hosted access by rotating or deleting the Application Password in WordPress (`Users → Profile → Application Passwords`). There is no server-side deprovisioning step.
+
+## Brute-force protection
+
+Defence in depth, not in our process:
+
+1. WordPress' native Application Password rate limit per IP / per user. Optionally harden with `wp-fail2ban`.
+2. Cloudflare WAF + per-IP throttle in front of `/mcp`.
+
+Our process implements no per-IP or per-user request-per-minute limit. ADR-015 hard caps (concurrency, scanned-feed/comment limits) apply inside individual tool calls and are sufficient to bound upstream pressure per request.
+
+## Client compatibility
+
+| Client | Status | Notes |
+|---|---|---|
+| Claude Desktop Custom Connector | supported | `Authorization` header configurable in connector form. |
+| MCP Inspector | supported | Arbitrary headers. |
+| Cursor | supported | Arbitrary headers. |
+| Claude Code | supported | Arbitrary headers via MCP config. |
+| ChatGPT Custom Connector | not supported | Requires OAuth 2.1 with PKCE; Basic Auth rejected. Deferred to a future OAuth-façade ADR. |
+
+Verify exact behaviour for each target client during `v0.2.0` integration.
 
 ## Fallback if Application Passwords are disabled
 
-Hosted public mode returns an actionable error:
+The hosted server returns an actionable error:
 
 ```text
-Application Passwords are not available for this account/site. Use local stdio mode or ask the site admin to enable Application Passwords.
+Application Passwords are not available for this account/site on
+club.hyperhuman.pl. Ask the site admin to enable the WordPress
+Application Passwords feature, or use the local stdio variant
+(`npx @hhc-mcp/stdio`).
 ```
 
-Cookie+nonce fallback is not supported in hosted public mode.
+Cookie + nonce fallback is not supported in hosted public mode.
 
-## Client matrix
+## Self-hosted variants
 
-| Client | Local stdio | Hosted public OAuth | Cloudflare Access private | Stateless upstream headers |
-|---|---:|---:|---:|---:|
-| Claude Desktop local | yes | n/a | n/a | via local env only |
-| Claude Code local | yes | n/a | n/a | via local env only |
-| Claude Custom Connector | n/a | target | maybe not enough alone | generally no |
-| ChatGPT remote connector | n/a | target | maybe not enough alone | generally no |
-| MCP Inspector | yes | useful for tests | useful for tests | useful for private tests |
-| Self-hosted private client | optional | optional | yes | yes, if trusted |
+Operators running their own deployment may add stronger edge protection in front of Basic Auth — for example Cloudflare Access service tokens, mTLS, or an oauth2-proxy/Authelia front. Whatever they layer on top must still know the authenticated subject and not rely on an unverified header from the public internet.
 
-Exact client compatibility must be verified during implementation against the first selected hosted client.
-
-## Keycloak baseline
-
-Keycloak is the first supported hosted OAuth provider because it is self-hostable, standards-oriented, and aligns with MCP authorization tutorial patterns.
-
-Expected Keycloak setup:
-
-- OIDC/OAuth realm for `hhc-mcp`,
-- client/scopes for MCP access,
-- audience/resource configured for the MCP server URL,
-- JWKS available to `@hhc-mcp/http`,
-- PKCE enabled,
-- short-lived access tokens,
-- refresh-token policy chosen according to hosted client behavior.
-
-## Alternative edge/auth stacks
-
-Self-hosted operators may use alternatives:
-
-- nginx + oauth2-proxy,
-- Traefik + ForwardAuth/OIDC,
-- Keycloak/OIDC directly,
-- Authelia,
-- Cloudflare Access,
-- native OAuth provider embedded in `@hhc-mcp/http`.
-
-Whatever stack is used, the server must know the authenticated MCP subject and must not rely on an unverified header from the public internet.
+That layering is out of scope for the hosted MVP and out of scope for `@hhc-mcp/http`. The core server stays Basic-Auth pass-through.
