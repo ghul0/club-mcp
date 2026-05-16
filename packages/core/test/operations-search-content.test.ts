@@ -78,10 +78,15 @@ describe('searchContent', () => {
     expect(isOk(result)).toBe(true);
     if (!isOk(result)) return;
     expect(result.value.query).toBe('startup');
-    expect(result.value.members).toHaveLength(2);
-    expect(result.value.posts).toHaveLength(3);
-    expect(result.value.comments).toHaveLength(2);
-    expect(result.value.comments.map((c) => c.comment.id).sort()).toEqual([100, 102]);
+    expect(result.value.counts.members).toBe(2);
+    expect(result.value.counts.posts).toBe(3);
+    expect(result.value.counts.comments).toBe(2);
+    const commentResults = result.value.results.filter((r) => r.kind === 'comment');
+    const commentIds = commentResults
+      .map((r) => r.comment?.id)
+      .filter((v): v is number => typeof v === 'number')
+      .sort((a, b) => a - b);
+    expect(commentIds).toEqual([100, 102]);
     expect(calls.some(([p]) => p === '/members')).toBe(true);
     expect(calls.some(([p]) => p === '/feeds')).toBe(true);
   });
@@ -103,9 +108,9 @@ describe('searchContent', () => {
 
     expect(isOk(result)).toBe(true);
     if (!isOk(result)) return;
-    expect(result.value.members).toHaveLength(1);
-    expect(result.value.posts).toEqual([]);
-    expect(result.value.comments).toEqual([]);
+    expect(result.value.counts.members).toBe(1);
+    expect(result.value.counts.posts).toBe(0);
+    expect(result.value.counts.comments).toBe(0);
     expect(calls.every(([p]) => p === '/members')).toBe(true);
   });
 
@@ -139,7 +144,27 @@ describe('searchContent', () => {
     expect(result.error.code).toBe('validation');
   });
 
-  it('caps members and posts at limit', async () => {
+  it('rejects a query with control characters (Bucket D hardening)', async () => {
+    const { client } = makeClient(() => {
+      throw new Error('should not call');
+    });
+    const result = await searchContent(client, { query: 'abcdef' });
+    expect(isErr(result)).toBe(true);
+    if (!isErr(result)) return;
+    expect(result.error.code).toBe('validation');
+  });
+
+  it('rejects a query with leading or trailing whitespace (Bucket D trim)', async () => {
+    const { client } = makeClient(() => {
+      throw new Error('should not call');
+    });
+    const result = await searchContent(client, { query: '  hello  ' });
+    expect(isErr(result)).toBe(true);
+    if (!isErr(result)) return;
+    expect(result.error.code).toBe('validation');
+  });
+
+  it('caps combined results at the global limit (members fill first, posts next)', async () => {
     const manyMembers = Array.from({ length: 10 }, (_, i) => memberFixture(i + 1, `User${(i + 1).toString()}`));
     const manyFeeds = Array.from({ length: 10 }, (_, i) => feedFixture(i + 1, `topic ${(i + 1).toString()}`));
     const { client } = makeClient((path) => {
@@ -151,13 +176,16 @@ describe('searchContent', () => {
     const result = await searchContent(client, {
       query: 'topic',
       include_comments: false,
-      limit: 3,
+      limit: 5,
     });
 
     expect(isOk(result)).toBe(true);
     if (!isOk(result)) return;
-    expect(result.value.members).toHaveLength(3);
-    expect(result.value.posts).toHaveLength(3);
+    const total = result.value.counts.members + result.value.counts.posts + result.value.counts.comments;
+    expect(total).toBe(5);
+    expect(result.value.results.length).toBe(5);
+    expect(result.value.counts.members).toBe(5);
+    expect(result.value.counts.posts).toBe(0);
   });
 
   it('filters comments by query substring and caps globally', async () => {
@@ -209,10 +237,184 @@ describe('searchContent', () => {
 
     expect(isOk(result)).toBe(true);
     if (!isOk(result)) return;
-    expect(result.value.comments).toHaveLength(2);
-    for (const item of result.value.comments) {
-      expect(String(item.comment.message)).toContain('needle');
+    expect(result.value.counts.comments).toBe(2);
+    const hits = result.value.results.filter((r) => r.kind === 'comment');
+    for (const item of hits) {
+      expect(String(item.comment?.message_text ?? '')).toContain('needle');
     }
+  });
+
+  it('reports scan_metadata.scanned_comments and respects the 2000 hard cap (Bucket E)', async () => {
+    let totalCommentsServed = 0;
+    const feeds = Array.from({ length: 30 }, (_, i) => feedFixture(i + 1, `post ${(i + 1).toString()}`));
+    const { client } = makeClient((path) => {
+      if (path === '/feeds') {
+        return { ok: true, value: { feeds } };
+      }
+      if (/^\/feeds\/\d+\/comments$/.exec(path)) {
+        const comments = Array.from({ length: 100 }, (_, j) => {
+          totalCommentsServed += 1;
+          return commentFixture(totalCommentsServed, `comment body ${totalCommentsServed.toString()}`);
+        });
+        return { ok: true, value: { comments } };
+      }
+      throw new Error(`unexpected: ${path}`);
+    });
+
+    const result = await searchContent(client, {
+      query: 'comment',
+      include_members: false,
+      include_posts: false,
+      include_comments: true,
+      limit: 100,
+    });
+
+    expect(isOk(result)).toBe(true);
+    if (!isOk(result)) return;
+    expect(result.value.scan_metadata.scanned_comments).toBeLessThanOrEqual(2000);
+    expect(result.value.scan_metadata.scanned_comments).toBeGreaterThan(0);
+  });
+
+  it('filters comments by since timestamp when provided (Bucket A3)', async () => {
+    const { client } = makeClient((path) => {
+      if (path === '/feeds') {
+        return { ok: true, value: { feeds: [feedFixture(1, 'p1')] } };
+      }
+      if (path === '/feeds/1/comments') {
+        return {
+          ok: true,
+          value: {
+            comments: [
+              { id: 1, message: 'needle one', created_at: '2025-01-01 00:00:00' },
+              { id: 2, message: 'needle two', created_at: '2026-06-01 12:00:00' },
+            ],
+          },
+        };
+      }
+      throw new Error(`unexpected: ${path}`);
+    });
+
+    const result = await searchContent(client, {
+      query: 'needle',
+      since: '2026-01-01',
+      include_members: false,
+      include_posts: false,
+      include_comments: true,
+    });
+
+    expect(isOk(result)).toBe(true);
+    if (!isOk(result)) return;
+    const ids = result.value.results
+      .filter((r) => r.kind === 'comment')
+      .map((r) => r.comment?.id);
+    expect(ids).toEqual([2]);
+    expect(result.value.scan_metadata.since).toBe('2026-01-01 00:00:00');
+  });
+
+  it('paginates /feeds up to scan_feed_limit (Bucket N)', async () => {
+    const allFeeds = Array.from({ length: 250 }, (_, i) => feedFixture(i + 1, `topic ${(i + 1).toString()}`));
+    const { client, calls } = makeClient((path, query) => {
+      if (path === '/members') return { ok: true, value: { members: [] } };
+      if (path === '/feeds') {
+        const page = Number(query?.page ?? 1);
+        const perPage = Number(query?.per_page ?? 100);
+        const start = (page - 1) * perPage;
+        const slice = allFeeds.slice(start, start + perPage);
+        return { ok: true, value: { feeds: slice } };
+      }
+      if (/^\/feeds\/\d+\/comments$/.exec(path)) {
+        return { ok: true, value: { comments: [] } };
+      }
+      throw new Error(`unexpected: ${path}`);
+    });
+
+    const result = await searchContent(client, {
+      query: 'topic',
+      include_members: false,
+      include_posts: false,
+      include_comments: true,
+      scan_feed_limit: 200,
+    });
+
+    expect(isOk(result)).toBe(true);
+    if (!isOk(result)) return;
+    const feedCalls = calls.filter(([p]) => p === '/feeds');
+    expect(feedCalls.length).toBe(2);
+    for (const [, , q] of feedCalls) {
+      expect(Number(q?.per_page)).toBe(100);
+    }
+  });
+
+  it('paginates post search up to scan_feed_limit and sends search_in[]=post_content', async () => {
+    const allFeeds = Array.from({ length: 250 }, (_, i) => feedFixture(i + 1, `topic ${(i + 1).toString()}`));
+    const { client, calls } = makeClient((path, query) => {
+      if (path === '/feeds') {
+        const page = Number(query?.page ?? 1);
+        const perPage = Number(query?.per_page ?? 100);
+        const start = (page - 1) * perPage;
+        return { ok: true, value: { feeds: allFeeds.slice(start, start + perPage) } };
+      }
+      throw new Error(`unexpected: ${path}`);
+    });
+
+    const result = await searchContent(client, {
+      query: 'topic',
+      include_members: false,
+      include_posts: true,
+      include_comments: false,
+      scan_feed_limit: 150,
+      limit: 10,
+    });
+
+    expect(isOk(result)).toBe(true);
+    if (!isOk(result)) return;
+    expect(result.value.results).toHaveLength(10);
+    const feedCalls = calls.filter(([p]) => p === '/feeds');
+    expect(feedCalls).toHaveLength(2);
+    expect(feedCalls[0]?.[2]?.['search_in[]']).toBe('post_content');
+    expect(feedCalls[0]?.[2]?.page).toBe(1);
+    expect(feedCalls[1]?.[2]?.page).toBe(2);
+  });
+
+  it('carries feed/post context into comment hits even when include_posts=false (Bucket O)', async () => {
+    const { client } = makeClient((path) => {
+      if (path === '/feeds') {
+        return {
+          ok: true,
+          value: {
+            feeds: [
+              {
+                id: 7,
+                title: 'Source thread',
+                permalink: 'https://example.test/p/7',
+                space: { slug: 'general', title: 'General' },
+                created_at: '2025-01-01T00:00:00Z',
+              },
+            ],
+          },
+        };
+      }
+      if (path === '/feeds/7/comments') {
+        return { ok: true, value: { comments: [commentFixture(900, 'has needle inside')] } };
+      }
+      throw new Error(`unexpected: ${path}`);
+    });
+
+    const result = await searchContent(client, {
+      query: 'needle',
+      include_members: false,
+      include_posts: false,
+      include_comments: true,
+    });
+
+    expect(isOk(result)).toBe(true);
+    if (!isOk(result)) return;
+    const commentHits = result.value.results.filter((r) => r.kind === 'comment');
+    expect(commentHits).toHaveLength(1);
+    expect(commentHits[0]?.comment?.post?.id).toBe(7);
+    expect(commentHits[0]?.comment?.post?.title).toBe('Source thread');
+    expect(commentHits[0]?.comment?.post?.permalink).toBe('https://example.test/p/7');
+    expect(commentHits[0]?.comment?.space?.slug).toBe('general');
   });
 
   it('propagates error when a scope sub-request fails', async () => {

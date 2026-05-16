@@ -5,8 +5,17 @@ import { err, ok } from '../result.js';
 import type { AppError } from '../errors.js';
 import { parseSince } from '../date.js';
 import { paginate } from '../pagination.js';
-import type { Feed } from '../schemas/feeds.js';
-import { FeedsListResponseSchema } from '../schemas/feeds.js';
+import type { Feed, PublicFeed } from '../schemas/feeds.js';
+import {
+  FeedsListResponseSchema,
+  PublicFeedSchema,
+  toPublicFeed,
+} from '../schemas/feeds.js';
+
+export const GetRecentPostsOutputSchema = z.object({
+  posts: z.array(PublicFeedSchema),
+  since: z.string(),
+});
 
 const SPACE_PATTERN = /^[A-Za-z0-9_-]{1,120}$/;
 
@@ -23,7 +32,7 @@ export type GetRecentPostsInput = z.input<typeof GetRecentPostsInputSchema>;
 type ResolvedInput = z.output<typeof GetRecentPostsInputSchema>;
 
 export interface GetRecentPostsOutput {
-  readonly posts: readonly Feed[];
+  readonly posts: readonly PublicFeed[];
   readonly since: string;
 }
 
@@ -47,25 +56,15 @@ const validateInput = (input: GetRecentPostsInput): Result<ResolvedInput, AppErr
 
 const extractFeeds = (
   envelope: z.infer<typeof FeedsListResponseSchema>,
+  perPage: number,
 ): { items: ReadonlyArray<Feed>; hasMore: boolean } => {
   const feeds = envelope.feeds;
   if (Array.isArray(feeds)) {
-    return { items: feeds, hasMore: false };
+    return { items: feeds, hasMore: feeds.length >= perPage };
   }
-  return { items: feeds.data, hasMore: feeds.has_more === true };
-};
-
-const oldestCreatedAt = (items: ReadonlyArray<Feed>): string | undefined => {
-  if (items.length === 0) {
-    return undefined;
-  }
-  let oldest = items[0]?.created_at;
-  for (const item of items) {
-    if (oldest === undefined || item.created_at < oldest) {
-      oldest = item.created_at;
-    }
-  }
-  return oldest;
+  const items = feeds.data;
+  const hasMore = feeds.has_more ?? items.length >= perPage;
+  return { items, hasMore };
 };
 
 export const getRecentPosts = async (
@@ -77,7 +76,7 @@ export const getRecentPosts = async (
   if (!validated.ok) {
     return err(validated.error);
   }
-  const { since: rawSince, limit, scan_feed_limit } = validated.value;
+  const { since: rawSince, space, limit, scan_feed_limit } = validated.value;
 
   const sinceResult = parseSince(rawSince, now);
   if (!sinceResult.ok) {
@@ -91,19 +90,23 @@ export const getRecentPosts = async (
   }): Promise<
     Result<{ readonly items: ReadonlyArray<Feed>; readonly hasMore: boolean; readonly totalScanned: number }, AppError>
   > => {
-    const response = await client.get(FEEDS_PATH, FeedsListResponseSchema, {
+    const query: Record<string, string | number | boolean | undefined> = {
+      feed_base_url: 'feeds',
       page: req.page,
       per_page: req.perPage,
-    });
+      order_by_type: 'new_activity',
+    };
+    if (space !== undefined) {
+      query.space = space;
+    }
+    const response = await client.get(FEEDS_PATH, FeedsListResponseSchema, query);
     if (!response.ok) {
       return err(response.error);
     }
-    const { items, hasMore } = extractFeeds(response.value);
-    const oldest = oldestCreatedAt(items);
-    const reachedThreshold = oldest !== undefined && oldest < sinceTimestamp;
+    const { items, hasMore } = extractFeeds(response.value, req.perPage);
     return ok({
       items,
-      hasMore: hasMore && !reachedThreshold,
+      hasMore,
       totalScanned: items.length,
     });
   };
@@ -117,10 +120,10 @@ export const getRecentPosts = async (
     return err(paged.error);
   }
 
-  const filtered: Feed[] = [];
+  const filtered: PublicFeed[] = [];
   for (const item of paged.value) {
     if (item.created_at >= sinceTimestamp) {
-      filtered.push(item);
+      filtered.push(toPublicFeed(item));
       if (filtered.length >= limit) {
         break;
       }

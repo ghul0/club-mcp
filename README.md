@@ -14,7 +14,28 @@ All variants expose safe read-only tools such as `club_get_recent_posts`, `club_
 
 ## Current status
 
-This repository folder currently contains architecture docs and an initial TypeScript pnpm workspace scaffold. Production implementation is not complete yet.
+v0.0.x ships the local stdio MCP server with 13 read-only tools that wrap the Hyper Human Club / Fluent Community REST API (`club_search_members`, `club_get_profile`, `club_get_my_profile`, `club_list_spaces`, `club_list_courses`, `club_get_feed`, `club_get_feed_comments`, `club_get_user_comments`, `club_get_recent_posts`, `club_get_recent_comments`, `club_get_since_summary`, `club_get_unread_notifications`, `club_search_content`). All tools are read-only and run against the authenticated user's own scope.
+
+Published packages:
+
+- `@hhc-mcp/core` — framework-agnostic core (GET-only REST client, Zod schemas, 13 operations).
+- `@hhc-mcp/stdio` — local stdio MCP transport, ready to register with Claude Desktop or any MCP client.
+
+`@hhc-mcp/http` is scaffold-only and reserved for v0.2.0 (hosted/self-hosted HTTP transport).
+
+### Install
+
+```bash
+npx -y @hhc-mcp/stdio
+```
+
+Or as a dependency:
+
+```bash
+pnpm add @hhc-mcp/stdio @hhc-mcp/core
+```
+
+See `docs/local-mode.md` for the Claude Desktop config and credential setup.
 
 License: MIT.
 

@@ -3,31 +3,51 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 import {
   searchMembers,
   SearchMembersInputSchema,
+  SearchMembersOutputSchema,
   getFeed,
   GetFeedInputSchema,
+  GetFeedOutputSchema,
   getFeedComments,
   GetFeedCommentsInputSchema,
+  GetFeedCommentsOutputSchema,
   getRecentPosts,
   GetRecentPostsInputSchema,
+  GetRecentPostsOutputSchema,
   getRecentComments,
   GetRecentCommentsInputSchema,
+  GetRecentCommentsOutputSchema,
   searchContent,
   SearchContentInputSchema,
+  SearchContentOutputSchema,
   getProfile,
   GetProfileInputSchema,
+  GetProfileOutputSchema,
   getMyProfile,
   GetMyProfileInputSchema,
+  GetMyProfileOutputSchema,
   listSpaces,
   ListSpacesInputSchema,
+  ListSpacesOutputSchema,
   listCourses,
   ListCoursesInputSchema,
+  ListCoursesOutputSchema,
   getUnreadNotifications,
   GetUnreadNotificationsInputSchema,
+  GetUnreadNotificationsOutputSchema,
   getUserComments,
   GetUserCommentsInputSchema,
+  GetUserCommentsOutputSchema,
   getSinceSummary,
   GetSinceSummaryInputSchema,
+  GetSinceSummaryOutputSchema,
+  externalServiceNonRetryable,
+  redactKeys,
+  ok,
+  err,
+  type Result,
+  type AppError,
   type GetClient,
+  type GetMyProfileOutput,
 } from '@hhc-mcp/core';
 import { mapResultToTool, type ToolResult } from './error-mapper.js';
 
@@ -68,6 +88,48 @@ const toJsonSchema = (schema: z.ZodType): Record<string, unknown> => {
   return json as Record<string, unknown>;
 };
 
+const validateOutput = <T>(
+  schema: z.ZodType<unknown>,
+  result: Result<T, AppError>,
+): Result<T, AppError> => {
+  if (!result.ok) {
+    return result;
+  }
+  const parsed = schema.safeParse(result.value);
+  if (!parsed.success) {
+    return err(
+      externalServiceNonRetryable(
+        `internal output schema mismatch: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
+      ),
+    );
+  }
+  return ok(parsed.data as T);
+};
+
+const inputRequestsPrivateFields = (input: unknown): boolean => {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+    return false;
+  }
+  return (input as { readonly include_private_fields?: unknown }).include_private_fields === true;
+};
+
+const redactMyProfileOutput = (
+  value: GetMyProfileOutput,
+  preserveEmail: boolean,
+): GetMyProfileOutput => {
+  const sanitized = redactKeys(value);
+  if (!preserveEmail || value.profile.email === undefined) {
+    return sanitized;
+  }
+  return {
+    ...sanitized,
+    profile: {
+      ...sanitized.profile,
+      email: value.profile.email,
+    },
+  };
+};
+
 const tools: readonly ToolEntry[] = [
   {
     def: {
@@ -77,7 +139,12 @@ const tools: readonly ToolEntry[] = [
       annotations: READ_ONLY_ANNOTATIONS,
     },
     handler: async (deps, input) =>
-      mapResultToTool(await searchMembers(deps.client, input as z.input<typeof SearchMembersInputSchema>)),
+      mapResultToTool(
+        validateOutput(
+          SearchMembersOutputSchema,
+          await searchMembers(deps.client, input as z.input<typeof SearchMembersInputSchema>),
+        ),
+      ),
   },
   {
     def: {
@@ -87,17 +154,31 @@ const tools: readonly ToolEntry[] = [
       annotations: READ_ONLY_ANNOTATIONS,
     },
     handler: async (deps, input) =>
-      mapResultToTool(await getProfile(deps.client, input as z.input<typeof GetProfileInputSchema>)),
+      mapResultToTool(
+        validateOutput(
+          GetProfileOutputSchema,
+          await getProfile(deps.client, input as z.input<typeof GetProfileInputSchema>),
+        ),
+      ),
   },
   {
     def: {
       name: 'club_get_my_profile',
-      description: 'Get the authenticated user\'s own profile (may include private fields with consent).',
+      description: 'Get the authenticated user\'s own profile (private fields redacted by default).',
       inputSchema: toJsonSchema(GetMyProfileInputSchema),
       annotations: READ_ONLY_ANNOTATIONS,
     },
-    handler: async (deps, input) =>
-      mapResultToTool(await getMyProfile(deps.client, input as z.input<typeof GetMyProfileInputSchema>)),
+    handler: async (deps, input) => {
+      const preserveEmail = inputRequestsPrivateFields(input);
+      return mapResultToTool(
+        validateOutput(
+          GetMyProfileOutputSchema,
+          await getMyProfile(deps.client, input as z.input<typeof GetMyProfileInputSchema>),
+        ),
+        undefined,
+        (value) => redactMyProfileOutput(value, preserveEmail),
+      );
+    },
   },
   {
     def: {
@@ -107,7 +188,12 @@ const tools: readonly ToolEntry[] = [
       annotations: READ_ONLY_ANNOTATIONS,
     },
     handler: async (deps, input) =>
-      mapResultToTool(await listSpaces(deps.client, input as z.input<typeof ListSpacesInputSchema>)),
+      mapResultToTool(
+        validateOutput(
+          ListSpacesOutputSchema,
+          await listSpaces(deps.client, input as z.input<typeof ListSpacesInputSchema>),
+        ),
+      ),
   },
   {
     def: {
@@ -117,7 +203,12 @@ const tools: readonly ToolEntry[] = [
       annotations: READ_ONLY_ANNOTATIONS,
     },
     handler: async (deps, input) =>
-      mapResultToTool(await listCourses(deps.client, input as z.input<typeof ListCoursesInputSchema>)),
+      mapResultToTool(
+        validateOutput(
+          ListCoursesOutputSchema,
+          await listCourses(deps.client, input as z.input<typeof ListCoursesInputSchema>),
+        ),
+      ),
   },
   {
     def: {
@@ -127,7 +218,12 @@ const tools: readonly ToolEntry[] = [
       annotations: READ_ONLY_ANNOTATIONS,
     },
     handler: async (deps, input) =>
-      mapResultToTool(await getFeed(deps.client, input as z.input<typeof GetFeedInputSchema>)),
+      mapResultToTool(
+        validateOutput(
+          GetFeedOutputSchema,
+          await getFeed(deps.client, input as z.input<typeof GetFeedInputSchema>),
+        ),
+      ),
   },
   {
     def: {
@@ -138,7 +234,10 @@ const tools: readonly ToolEntry[] = [
     },
     handler: async (deps, input) =>
       mapResultToTool(
-        await getFeedComments(deps.client, input as z.input<typeof GetFeedCommentsInputSchema>),
+        validateOutput(
+          GetFeedCommentsOutputSchema,
+          await getFeedComments(deps.client, input as z.input<typeof GetFeedCommentsInputSchema>),
+        ),
       ),
   },
   {
@@ -150,7 +249,10 @@ const tools: readonly ToolEntry[] = [
     },
     handler: async (deps, input) =>
       mapResultToTool(
-        await getUserComments(deps.client, input as z.input<typeof GetUserCommentsInputSchema>),
+        validateOutput(
+          GetUserCommentsOutputSchema,
+          await getUserComments(deps.client, input as z.input<typeof GetUserCommentsInputSchema>),
+        ),
       ),
   },
   {
@@ -162,7 +264,10 @@ const tools: readonly ToolEntry[] = [
     },
     handler: async (deps, input) =>
       mapResultToTool(
-        await getRecentPosts(deps.client, input as z.input<typeof GetRecentPostsInputSchema>),
+        validateOutput(
+          GetRecentPostsOutputSchema,
+          await getRecentPosts(deps.client, input as z.input<typeof GetRecentPostsInputSchema>),
+        ),
       ),
   },
   {
@@ -174,7 +279,10 @@ const tools: readonly ToolEntry[] = [
     },
     handler: async (deps, input) =>
       mapResultToTool(
-        await getRecentComments(deps.client, input as z.input<typeof GetRecentCommentsInputSchema>),
+        validateOutput(
+          GetRecentCommentsOutputSchema,
+          await getRecentComments(deps.client, input as z.input<typeof GetRecentCommentsInputSchema>),
+        ),
       ),
   },
   {
@@ -186,7 +294,10 @@ const tools: readonly ToolEntry[] = [
     },
     handler: async (deps, input) =>
       mapResultToTool(
-        await getSinceSummary(deps.client, input as z.input<typeof GetSinceSummaryInputSchema>),
+        validateOutput(
+          GetSinceSummaryOutputSchema,
+          await getSinceSummary(deps.client, input as z.input<typeof GetSinceSummaryInputSchema>),
+        ),
       ),
   },
   {
@@ -198,9 +309,12 @@ const tools: readonly ToolEntry[] = [
     },
     handler: async (deps, input) =>
       mapResultToTool(
-        await getUnreadNotifications(
-          deps.client,
-          input as z.input<typeof GetUnreadNotificationsInputSchema>,
+        validateOutput(
+          GetUnreadNotificationsOutputSchema,
+          await getUnreadNotifications(
+            deps.client,
+            input as z.input<typeof GetUnreadNotificationsInputSchema>,
+          ),
         ),
       ),
   },
@@ -213,7 +327,10 @@ const tools: readonly ToolEntry[] = [
     },
     handler: async (deps, input) =>
       mapResultToTool(
-        await searchContent(deps.client, input as z.input<typeof SearchContentInputSchema>),
+        validateOutput(
+          SearchContentOutputSchema,
+          await searchContent(deps.client, input as z.input<typeof SearchContentInputSchema>),
+        ),
       ),
   },
 ];

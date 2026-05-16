@@ -4,10 +4,23 @@ import type { AppError } from '../errors.js';
 import { validationError } from '../errors.js';
 import type { Result } from '../result.js';
 import { err, ok } from '../result.js';
-import type { Feed } from '../schemas/feeds.js';
-import { FeedByIdResponseSchema } from '../schemas/feeds.js';
-import type { Comment } from '../schemas/comments.js';
-import { CommentsResponseSchema } from '../schemas/comments.js';
+import type { PublicFeed } from '../schemas/feeds.js';
+import {
+  FeedByIdResponseSchema,
+  PublicFeedSchema,
+  toPublicFeed,
+} from '../schemas/feeds.js';
+import type { Comment, PublicComment } from '../schemas/comments.js';
+import {
+  CommentsResponseSchema,
+  PublicCommentSchema,
+  toPublicComment,
+} from '../schemas/comments.js';
+
+export const GetFeedOutputSchema = z.object({
+  feed: PublicFeedSchema,
+  comments: z.array(PublicCommentSchema).optional(),
+});
 import { paginate, type Page, type PageRequest } from '../pagination.js';
 
 export const GetFeedInputSchema = z
@@ -22,8 +35,8 @@ export type GetFeedInput = z.input<typeof GetFeedInputSchema>;
 type ResolvedInput = z.output<typeof GetFeedInputSchema>;
 
 export interface GetFeedOutput {
-  readonly feed: Feed;
-  readonly comments?: readonly Comment[];
+  readonly feed: PublicFeed;
+  readonly comments?: readonly PublicComment[];
 }
 
 const COMMENTS_PER_PAGE = 100;
@@ -68,8 +81,11 @@ export const getFeed = async (
     return err(feedResult.error);
   }
 
+  const rawFeed = feedResult.value.feed;
+  const publicFeed = toPublicFeed(rawFeed);
+
   if (!resolved.include_comments) {
-    return ok({ feed: feedResult.value.feed });
+    return ok({ feed: publicFeed });
   }
 
   const commentsPath = `/feeds/${String(resolved.feed_id)}/comments`;
@@ -96,5 +112,8 @@ export const getFeed = async (
     return err(commentsResult.error);
   }
 
-  return ok({ feed: feedResult.value.feed, comments: commentsResult.value });
+  const comments: PublicComment[] = commentsResult.value.map((c) =>
+    toPublicComment(c, { includeReactionsCount: true, includeStatus: true }),
+  );
+  return ok({ feed: publicFeed, comments });
 };

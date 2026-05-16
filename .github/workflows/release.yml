@@ -52,7 +52,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      # v0.0.1 ships only @hhc-mcp/core and @hhc-mcp/stdio.
+      # v0.0.x ships only @hhc-mcp/core and @hhc-mcp/stdio.
       # @hhc-mcp/http is a scaffold (marked "private": true) — excluded by filter
       # and skipped by pnpm publish for private packages.
       # pnpm publish (not npm publish) is required so the "workspace:*" range in

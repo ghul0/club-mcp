@@ -27,6 +27,13 @@ const FUNCTIONS: readonly string[] = [
   'createBasicAuthProvider',
   'loadBasicAuthFromEnv',
   'redactBasicAuth',
+  'toPublicMember',
+  'toPublicAuthor',
+  'toPublicSpaceRef',
+  'toPublicFeed',
+  'toPublicComment',
+  'toPublicProfile',
+  'toPublicSpace',
 ];
 
 const OPERATIONS: readonly string[] = [
@@ -48,20 +55,28 @@ const OPERATIONS: readonly string[] = [
 const SCHEMAS: readonly string[] = [
   'MemberSchema',
   'MembersResponseSchema',
+  'PublicMemberSchema',
   'AuthorSchema',
   'SpaceSchema',
   'FeedSchema',
   'FeedsListResponseSchema',
   'FeedByIdResponseSchema',
+  'PublicAuthorSchema',
+  'PublicSpaceRefSchema',
+  'PublicFeedSchema',
   'CommentSchema',
   'CommentsResponseSchema',
+  'PublicPostRefSchema',
+  'PublicCommentSchema',
   'ProfileSchema',
   'ProfileResponseSchema',
   'ProfileSpacesResponseSchema',
   'ProfileCommentsResponseSchema',
   'ProfileBundleSchema',
+  'PublicProfileSchema',
   'SpaceListItemSchema',
   'SpacesResponseSchema',
+  'PublicSpaceSchema',
   'CourseListItemSchema',
   'CoursesResponseSchema',
   'NotificationItemSchema',
@@ -86,6 +101,25 @@ const INPUT_SCHEMAS: readonly string[] = [
   'GetSinceSummaryInputSchema',
 ];
 
+const OUTPUT_SCHEMAS: readonly string[] = [
+  'SearchMembersOutputSchema',
+  'GetFeedOutputSchema',
+  'GetFeedCommentsOutputSchema',
+  'GetRecentPostsOutputSchema',
+  'GetRecentCommentsOutputSchema',
+  'RecentCommentItemSchema',
+  'SearchContentOutputSchema',
+  'SearchResultSchema',
+  'SearchScanMetadataSchema',
+  'GetProfileOutputSchema',
+  'GetMyProfileOutputSchema',
+  'ListSpacesOutputSchema',
+  'ListCoursesOutputSchema',
+  'GetUnreadNotificationsOutputSchema',
+  'GetUserCommentsOutputSchema',
+  'GetSinceSummaryOutputSchema',
+];
+
 const CONSTANTS: readonly string[] = [
   'packageName',
   'DEFAULT_CONCURRENCY',
@@ -98,6 +132,7 @@ const EXPECTED_RUNTIME_EXPORTS: ReadonlyArray<string> = [
   ...OPERATIONS,
   ...SCHEMAS,
   ...INPUT_SCHEMAS,
+  ...OUTPUT_SCHEMAS,
   ...CONSTANTS,
 ];
 

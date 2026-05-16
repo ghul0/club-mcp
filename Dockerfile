@@ -24,4 +24,6 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/packages ./packages
 USER hhc
 EXPOSE 3333
+# Reserved for v0.2.0 @hhc-mcp/http transport. Docker build is currently
+# disabled in release.yml because @hhc-mcp/http ships as scaffold only.
 CMD ["node", "packages/http/dist/index.js"]

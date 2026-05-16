@@ -78,15 +78,11 @@ exports[`tools/list snapshot > produces a stable snapshot of the full tools/list
       "openWorldHint": false,
       "readOnlyHint": true,
     },
-    "description": "Get the authenticated user's own profile (may include private fields with consent).",
+    "description": "Get the authenticated user's own profile (private fields redacted by default).",
     "inputSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": false,
       "properties": {
-        "consent": {
-          "const": true,
-          "type": "boolean",
-        },
         "include_private_fields": {
           "default": false,
           "type": "boolean",
@@ -96,9 +92,6 @@ exports[`tools/list snapshot > produces a stable snapshot of the full tools/list
           "type": "boolean",
         },
       },
-      "required": [
-        "consent",
-      ],
       "type": "object",
     },
     "name": "club_get_my_profile",

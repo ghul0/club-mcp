@@ -43,6 +43,7 @@ const buildErrorEnvelope = (error: AppError): PublicEnvelopeType => {
 export const mapResultToTool = <T>(
   result: Result<T, AppError>,
   successFormatter?: (value: T) => readonly ToolContent[],
+  successRedactor?: (value: T) => T,
 ): ToolResult => {
   if (!result.ok) {
     const error = result.error;
@@ -54,7 +55,7 @@ export const mapResultToTool = <T>(
     };
   }
   const value = result.value;
-  const sanitized = redactKeys(value);
+  const sanitized = successRedactor ? successRedactor(value) : redactKeys(value);
   const content = successFormatter
     ? successFormatter(sanitized)
     : [{ type: 'text' as const, text: JSON.stringify(sanitized, null, 2) }];

@@ -4,10 +4,21 @@ import type { Result } from '../result.js';
 import { err, ok } from '../result.js';
 import type { AppError } from '../errors.js';
 import { validationError } from '../errors.js';
-import type { Page, PageRequest } from '../pagination.js';
-import { paginate } from '../pagination.js';
-import type { Comment } from '../schemas/comments.js';
-import { CommentsResponseSchema } from '../schemas/comments.js';
+import { parseSince } from '../date.js';
+import type { Comment, PublicComment } from '../schemas/comments.js';
+import {
+  PublicCommentSchema,
+  toPublicComment,
+} from '../schemas/comments.js';
+import { ProfileCommentsResponseSchema, type Profile } from '../schemas/profile.js';
+
+export const GetUserCommentsOutputSchema = z.object({
+  comments: z.array(PublicCommentSchema),
+  pagination: z.object({
+    current_page: z.number().int().positive(),
+    has_more: z.boolean(),
+  }),
+});
 
 const USERNAME_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
 
@@ -22,47 +33,77 @@ export const GetUserCommentsInputSchema = z
 export type GetUserCommentsInput = z.input<typeof GetUserCommentsInputSchema>;
 
 export interface GetUserCommentsOutput {
-  readonly comments: readonly Comment[];
+  readonly comments: readonly PublicComment[];
+  readonly pagination: {
+    readonly current_page: number;
+    readonly has_more: boolean;
+  };
 }
 
 const PER_PAGE = 100;
 const MAX_PAGES = 50;
 
-const backfillAuthor = (comment: Comment): Comment => {
+type CommentAuthor = NonNullable<Comment['author']>;
+
+const profileToAuthor = (profile: Profile | undefined): CommentAuthor | undefined => {
+  if (profile === undefined) {
+    return undefined;
+  }
+  const base: CommentAuthor = {
+    user_id: profile.user_id,
+    username: profile.username,
+    display_name: profile.display_name,
+  };
+  if (typeof profile.permalink === 'string') {
+    return { ...base, permalink: profile.permalink };
+  }
+  return base;
+};
+
+const backfillAuthor = (comment: Comment, fallbackAuthor?: CommentAuthor): Comment => {
   if (comment.author !== undefined) {
     return comment;
   }
-  if (comment.xprofile === undefined) {
-    return comment;
+  if (comment.xprofile !== undefined) {
+    return { ...comment, author: comment.xprofile };
   }
-  return { ...comment, author: comment.xprofile };
+  if (fallbackAuthor !== undefined) {
+    return { ...comment, author: fallbackAuthor };
+  }
+  return comment;
 };
 
+interface ExtractedCommentPage {
+  readonly items: ReadonlyArray<Comment>;
+  readonly hasMore: boolean;
+}
+
 const extractPage = (
-  envelope: z.infer<typeof CommentsResponseSchema>,
+  envelope: z.infer<typeof ProfileCommentsResponseSchema>,
   perPage: number,
-): Page<Comment> => {
+): ExtractedCommentPage => {
   const raw = envelope.comments;
+  const fallbackAuthor = profileToAuthor(envelope.xprofile);
   if (Array.isArray(raw)) {
-    const items = raw.map(backfillAuthor);
-    return {
-      items,
-      hasMore: items.length >= perPage,
-      totalScanned: items.length,
-    };
+    const items = raw.map((c) => backfillAuthor(c, fallbackAuthor));
+    return { items, hasMore: items.length >= perPage };
   }
-  const items = raw.data.map(backfillAuthor);
+  const items = raw.data.map((c) => backfillAuthor(c, fallbackAuthor));
   const hasMore = raw.has_more ?? items.length >= perPage;
-  return {
-    items,
-    hasMore,
-    totalScanned: items.length,
-  };
+  return { items, hasMore };
+};
+
+const passesSince = (c: Comment, threshold: string): boolean => {
+  if (c.created_at >= threshold) {
+    return true;
+  }
+  return typeof c.updated_at === 'string' && c.updated_at >= threshold;
 };
 
 export const getUserComments = async (
   client: GetClient,
   input: GetUserCommentsInput,
+  now?: Date,
 ): Promise<Result<GetUserCommentsOutput, AppError>> => {
   const parsed = GetUserCommentsInputSchema.safeParse(input);
   if (!parsed.success) {
@@ -71,31 +112,61 @@ export const getUserComments = async (
     return err(validationError(message));
   }
 
-  const { username, limit } = parsed.data;
+  const { username, since: rawSince, limit } = parsed.data;
+
+  let sinceTimestamp: string | undefined;
+  if (rawSince !== undefined) {
+    const sinceResult = parseSince(rawSince, now);
+    if (!sinceResult.ok) {
+      return err(sinceResult.error);
+    }
+    sinceTimestamp = sinceResult.value;
+  }
+
   const path = `/profile/${encodeURIComponent(username)}/comments`;
 
-  const fetchPage = async (
-    req: PageRequest,
-  ): Promise<Result<Page<Comment>, AppError>> => {
-    const response = await client.get(path, CommentsResponseSchema, {
-      page: req.page,
-      per_page: req.perPage,
+  const collected: Comment[] = [];
+  let currentPage = 1;
+  let upstreamHasMore = false;
+  let limitTruncatedPage = false;
+
+  while (currentPage <= MAX_PAGES) {
+    const response = await client.get(path, ProfileCommentsResponseSchema, {
+      page: currentPage,
+      per_page: PER_PAGE,
     });
     if (!response.ok) {
       return err(response.error);
     }
-    return ok(extractPage(response.value, req.perPage));
-  };
+    const page = extractPage(response.value, PER_PAGE);
+    upstreamHasMore = page.hasMore;
 
-  const result = await paginate(fetchPage, {
-    maxItems: limit,
-    maxPages: MAX_PAGES,
-    perPage: PER_PAGE,
-  });
+    for (const c of page.items) {
+      if (sinceTimestamp !== undefined && !passesSince(c, sinceTimestamp)) {
+        continue;
+      }
+      if (collected.length >= limit) {
+        limitTruncatedPage = true;
+        break;
+      }
+      collected.push(c);
+    }
 
-  if (!result.ok) {
-    return err(result.error);
+    if (collected.length >= limit) {
+      break;
+    }
+    if (!upstreamHasMore) {
+      break;
+    }
+    currentPage += 1;
   }
 
-  return ok({ comments: result.value });
+  const comments: PublicComment[] = collected.map((c) => toPublicComment(c));
+  return ok({
+    comments,
+    pagination: {
+      current_page: currentPage,
+      has_more: limitTruncatedPage || upstreamHasMore,
+    },
+  });
 };

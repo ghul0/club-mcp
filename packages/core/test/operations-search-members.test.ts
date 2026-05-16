@@ -140,6 +140,30 @@ describe('searchMembers', () => {
     expect(result.error.code).toBe('validation');
   });
 
+  it('rejects a query with control characters (Bucket D hardening)', async () => {
+    const client = makeClient(() => {
+      throw new Error('should not be called');
+    });
+
+    const result = await searchMembers(client, { query: 'abcdef' });
+
+    expect(isErr(result)).toBe(true);
+    if (!isErr(result)) return;
+    expect(result.error.code).toBe('validation');
+  });
+
+  it('rejects a query with leading or trailing whitespace (Bucket D trim)', async () => {
+    const client = makeClient(() => {
+      throw new Error('should not be called');
+    });
+
+    const result = await searchMembers(client, { query: '  hello  ' });
+
+    expect(isErr(result)).toBe(true);
+    if (!isErr(result)) return;
+    expect(result.error.code).toBe('validation');
+  });
+
   it('propagates client errors unchanged', async () => {
     const upstreamErr = externalService('upstream boom');
     const client = makeClient(() => Promise.resolve(err(upstreamErr)));

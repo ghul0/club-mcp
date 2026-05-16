@@ -85,7 +85,7 @@ describe('ProfileSchema', () => {
 
     expect(parsed.future_field).toBeUndefined();
     expect(parsed.meta).toBeUndefined();
-    expect(parsed.email).toBeUndefined();
+    expect(parsed.email).toBe('thomas@example.com');
     expect(parsed.user_email).toBeUndefined();
     expect(parsed.wp_user_id).toBeUndefined();
     expect(parsed.app_pass).toBeUndefined();
