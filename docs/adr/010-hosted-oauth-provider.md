@@ -1,6 +1,6 @@
 # ADR-010: Hosted OAuth provider
 
-Status: accepted
+Status: superseded by [ADR-019](019-hosted-auth-basic-pass-through.md)
 
 ## Context
 

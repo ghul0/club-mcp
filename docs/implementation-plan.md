@@ -1,25 +1,26 @@
 # Implementation plan
 
+> **Hosted auth pivot (2026-05-16).** [ADR-019](adr/019-hosted-auth-basic-pass-through.md) supersedes ADRs 002/003/010/011/014. Phase 6 (Keycloak OAuth) and Phase 7 (encrypted WordPress connect flow) below are kept only as the historical record of work that was planned but never built. Authoritative roadmap and milestones now live in `ROADMAP.md`; hosted auth design lives in `docs/hosted-auth.md` and ADR-019.
+
 ## Phase 0 — decisions already made
 
 Accepted architecture decisions:
 
 - ADR-001: TypeScript-first implementation.
-- ADR-002: hosted public MCP uses OAuth 2.1 protected resource server model.
-- ADR-003: hosted public MVP uses encrypted WordPress Application Password connect flow.
 - ADR-004: pnpm workspace with three packages.
 - ADR-005: npm/npx for local stdio, GHCR Docker for HTTP.
 - ADR-006: read-only v1.
 - ADR-007: parameterized base URL with safe default.
 - ADR-008: typed Result-style expected errors.
 - ADR-009: target clients and test order.
-- ADR-010: Keycloak as first hosted OAuth provider.
-- ADR-011: PostgreSQL plus envelope encryption for hosted credentials.
 - ADR-012: MIT license.
-- ADR-013: VPS + Docker Compose + Cloudflare Tunnel as first hosted deployment.
-- ADR-014: Docker secrets or 1Password/Doppler for MVP key management.
-- ADR-015: initial hosted rate limits.
+- ADR-013: VPS + Docker Compose + Cloudflare Tunnel as first hosted deployment (single service per ADR-019).
+- ADR-015: hard caps in core (per-user request-per-minute limits deferred per ADR-019).
 - ADR-016: MCP tool error envelope.
+- ADR-017: decision log policy.
+- ADR-019: hosted auth = HTTP Basic Auth pass-through; no OAuth server, no credential store.
+
+Superseded by ADR-019 (kept for historical context): ADR-002, ADR-003, ADR-010, ADR-011, ADR-014.
 
 No Python production implementation is planned. The Python `hhc.py` is a behavior reference and golden-test oracle only.
 

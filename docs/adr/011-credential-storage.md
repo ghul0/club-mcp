@@ -1,6 +1,6 @@
 # ADR-011: Hosted credential storage
 
-Status: accepted
+Status: superseded by [ADR-019](019-hosted-auth-basic-pass-through.md)
 
 ## Context
 
