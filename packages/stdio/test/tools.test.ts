@@ -104,4 +104,42 @@ describe('callTool', () => {
     const structured = result.structuredContent as { error: { code: string } };
     expect(structured.error.code).toBe('validation');
   });
+
+  it('preserves my profile email only when include_private_fields=true', async () => {
+    const { client } = buildMockClient({
+      '/profile/me': {
+        profile: {
+          user_id: 1,
+          username: 'me',
+          display_name: 'Me',
+          email: 'me@example.com',
+        },
+      },
+    });
+    const result = await callTool({ client }, 'club_get_my_profile', {
+      include_private_fields: true,
+      include_spaces: false,
+    });
+    expect(result.isError).toBeUndefined();
+    const structured = result.structuredContent as { result: { profile: { email?: string } } };
+    expect(structured.result.profile.email).toBe('me@example.com');
+  });
+
+  it('validates output shape on success (Bucket C defense in depth)', async () => {
+    const { client } = buildMockClient({
+      '/members': { members: [{ user_id: 1, username: 'thomas', display_name: 'Thomas' }] },
+    });
+    const result = await callTool({ client }, 'club_search_members', { query: 'thomas' });
+    expect(result.isError).toBeUndefined();
+    const structured = result.structuredContent as { result: { members: unknown[] } };
+    expect(structured.result.members).toHaveLength(1);
+  });
+
+  it('returns external_service error when output is structurally broken (defense in depth)', async () => {
+    const { client } = buildMockClient({
+      '/notifications/unread': { notifications: [{ id: 'not-a-number', created_at: '2026-05-15' }] },
+    });
+    const result = await callTool({ client }, 'club_get_unread_notifications', {});
+    expect(result.isError).toBe(true);
+  });
 });

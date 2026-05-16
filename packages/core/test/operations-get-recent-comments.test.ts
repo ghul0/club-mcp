@@ -143,11 +143,11 @@ describe('getRecentComments', () => {
     if (!result.ok) throw new Error('expected ok');
     expect(result.value.comments).toHaveLength(4);
     expect(result.value.since).toBe('2024-06-15 00:00:00');
-    const ids = result.value.comments.map((c) => c.comment.id).sort((a, b) => a - b);
+    const ids = result.value.comments.map((c) => c.id).sort((a, b) => a - b);
     expect(ids).toEqual([9001, 9002, 9003, 9004]);
     for (const item of result.value.comments) {
-      expect(item.feed.id).toBeGreaterThan(0);
-      expect(typeof item.feed.title).toBe('string');
+      expect(item.post?.id).toBeGreaterThan(0);
+      expect(typeof item.post?.title).toBe('string');
     }
   });
 
@@ -184,7 +184,7 @@ describe('getRecentComments', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
     expect(result.value.comments).toHaveLength(1);
-    expect(result.value.comments[0]?.comment.id).toBe(5002);
+    expect(result.value.comments[0]?.id).toBe(5002);
   });
 
   it('rejects invalid since with a validation error', async () => {
@@ -258,7 +258,7 @@ describe('getRecentComments', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
     expect(result.value.comments).toHaveLength(2);
-    const ids = result.value.comments.map((c) => c.comment.id).sort((a, b) => a - b);
+    const ids = result.value.comments.map((c) => c.id).sort((a, b) => a - b);
     expect(ids).toEqual([7001, 7002]);
   });
 
@@ -299,7 +299,7 @@ describe('getRecentComments', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
     expect(result.value.comments).toHaveLength(3);
-    const ids = result.value.comments.map((c) => c.comment.id).sort((a, b) => a - b);
+    const ids = result.value.comments.map((c) => c.id).sort((a, b) => a - b);
     expect(ids).toEqual([6001, 6002, 6003]);
   });
 
@@ -336,7 +336,7 @@ describe('getRecentComments', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
     expect(result.value.comments).toHaveLength(1);
-    expect(result.value.comments[0]?.comment.id).toBe(6101);
+    expect(result.value.comments[0]?.id).toBe(6101);
   });
 
   it('includes edited old comments when include_edits=true', async () => {
@@ -371,7 +371,7 @@ describe('getRecentComments', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
-    const ids = result.value.comments.map((c) => c.comment.id).sort((a, b) => a - b);
+    const ids = result.value.comments.map((c) => c.id).sort((a, b) => a - b);
     expect(ids).toEqual([6201, 6202]);
   });
 
@@ -408,7 +408,7 @@ describe('getRecentComments', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
     expect(result.value.comments).toHaveLength(1);
-    expect(result.value.comments[0]?.comment.id).toBe(6302);
+    expect(result.value.comments[0]?.id).toBe(6302);
   });
 
   it('respects comment_per_feed_limit cap', async () => {
@@ -449,6 +449,37 @@ describe('getRecentComments', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
     expect(result.value.comments).toHaveLength(2);
+  });
+
+  it('uses comment_per_feed_limit as per_page when it is below upstream page max', async () => {
+    const calls: Array<{ readonly path: string; readonly query?: Record<string, string | number | boolean | undefined> }> = [];
+    const get = vi.fn(
+      async (
+        path: string,
+        _schema: unknown,
+        query?: Record<string, string | number | boolean | undefined>,
+      ): Promise<Result<unknown, AppError>> => {
+        calls.push(query === undefined ? { path } : { path, query });
+        if (path === '/feeds') {
+          return ok(feedsResponse({ data: [feed(551, '2024-06-15 11:00:00')], has_more: false }));
+        }
+        if (path === '/feeds/551/comments') {
+          return ok(commentsResponse({ data: [comment(8551, 551, '2024-06-15 11:30:00')], has_more: false }));
+        }
+        return err(externalService(`unexpected path ${path}`));
+      },
+    );
+    const client = { get } as unknown as GetClient;
+
+    const result = await getRecentComments(
+      client,
+      { since: '2024-06-15', scan_feed_limit: 100, comment_per_feed_limit: 25, concurrency: 4 },
+      NOW,
+    );
+
+    expect(result.ok).toBe(true);
+    const commentCall = calls.find((c) => c.path === '/feeds/551/comments');
+    expect(commentCall?.query?.per_page).toBe(25);
   });
 
   it('returns empty comments when no recent posts exist', async () => {

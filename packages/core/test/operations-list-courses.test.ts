@@ -131,6 +131,51 @@ describe('listCourses', () => {
     expect(result.error).toBe(upstreamErr);
   });
 
+  it('strips sections from each course when include_sections=false (Bucket A5)', async () => {
+    const client = makeClient(() =>
+      Promise.resolve(
+        ok({
+          courses: [
+            {
+              course: { id: 1, slug: 'intro', title: 'Intro' },
+              sections: [{ id: 10, title: 'Section A', lessons: [] }],
+              track: 'beginner',
+            },
+          ],
+        }),
+      ),
+    );
+
+    const result = await listCourses(client, { include_sections: false });
+
+    expect(isOk(result)).toBe(true);
+    if (!isOk(result)) return;
+    expect(result.value.courses).toHaveLength(1);
+    expect(result.value.courses[0]?.sections).toBeUndefined();
+    expect(result.value.courses[0]?.track).toBe('beginner');
+  });
+
+  it('preserves sections by default (include_sections=true)', async () => {
+    const client = makeClient(() =>
+      Promise.resolve(
+        ok({
+          courses: [
+            {
+              course: { id: 1, slug: 'intro', title: 'Intro' },
+              sections: [{ id: 10, title: 'Section A', lessons: [] }],
+            },
+          ],
+        }),
+      ),
+    );
+
+    const result = await listCourses(client);
+
+    expect(isOk(result)).toBe(true);
+    if (!isOk(result)) return;
+    expect(result.value.courses[0]?.sections).toHaveLength(1);
+  });
+
   it('does not call client when input contains an unknown property (strict)', async () => {
     const getMock = vi.fn(() => Promise.resolve(ok({ courses: [] })));
     const client: GetClient = { get: getMock as unknown as GetClient['get'] };

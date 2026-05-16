@@ -4,11 +4,36 @@ import type { Result } from '../result.js';
 import { err } from '../result.js';
 import type { AppError } from '../errors.js';
 import { validationError } from '../errors.js';
-import { MembersResponseSchema, type Member } from '../schemas/members.js';
+import {
+  MembersResponseSchema,
+  PublicMemberSchema,
+  toPublicMember,
+  type Member,
+  type PublicMember,
+} from '../schemas/members.js';
+
+export const SearchMembersOutputSchema = z.object({
+  members: z.array(PublicMemberSchema),
+});
+
+const hasControlChars = (value: string): boolean => {
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    if (code < 0x20 || code === 0x7f) {
+      return true;
+    }
+  }
+  return false;
+};
 
 export const SearchMembersInputSchema = z
   .object({
-    query: z.string().min(1).max(200),
+    query: z
+      .string()
+      .min(1)
+      .max(200)
+      .refine((v) => !hasControlChars(v), { message: 'must not contain control characters' })
+      .refine((v) => v === v.trim(), { message: 'must be trimmed (no leading or trailing whitespace)' }),
     limit: z.number().int().positive().max(100).optional().default(20),
   })
   .strict();
@@ -16,7 +41,7 @@ export const SearchMembersInputSchema = z
 export type SearchMembersInput = z.input<typeof SearchMembersInputSchema>;
 
 export interface SearchMembersOutput {
-  readonly members: readonly Member[];
+  readonly members: readonly PublicMember[];
 }
 
 const formatIssues = (error: z.ZodError): string => {
@@ -56,5 +81,6 @@ export const searchMembers = async (
     return err(response.error);
   }
 
-  return { ok: true, value: { members: extractMembers(response.value) } };
+  const members = extractMembers(response.value).map((m) => toPublicMember(m));
+  return { ok: true, value: { members } };
 };

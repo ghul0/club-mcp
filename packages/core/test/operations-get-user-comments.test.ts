@@ -107,8 +107,25 @@ describe('getUserComments', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
     const comment = result.value.comments[0];
-    expect(comment?.author).toEqual(xp);
-    expect(comment?.xprofile).toEqual(xp);
+    expect(comment?.author?.user_id).toBe(xp.user_id);
+    expect(comment?.author?.username).toBe(xp.username);
+    expect(comment?.author?.display_name).toBe(xp.display_name);
+  });
+
+  it('backfills author from top-level xprofile when comment-level metadata is missing', async () => {
+    const xp = author('top_level_user');
+    const client = buildClient(() =>
+      ok({
+        comments: { data: [makeComment(11)], has_more: false },
+        xprofile: xp,
+      }),
+    );
+
+    const result = await getUserComments(client, { username: 'top_level_user' });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value.comments[0]?.author?.username).toBe('top_level_user');
   });
 
   it('leaves comments with an existing author unchanged', async () => {
@@ -124,7 +141,7 @@ describe('getUserComments', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
-    expect(result.value.comments[0]?.author).toEqual(existing);
+    expect(result.value.comments[0]?.author?.username).toBe(existing.username);
   });
 
   it('does not invent an author when neither author nor xprofile is present', async () => {
@@ -135,7 +152,6 @@ describe('getUserComments', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
     expect(result.value.comments[0]?.author).toBeUndefined();
-    expect(result.value.comments[0]?.xprofile).toBeUndefined();
   });
 
   it('caps results at limit even if upstream has more pages', async () => {
@@ -158,6 +174,68 @@ describe('getUserComments', () => {
     expect(result.value.comments.map((c) => c.id)).toEqual([1, 2, 3, 4, 5]);
   });
 
+  it('filters comments by since timestamp when provided (Bucket A1)', async () => {
+    const NOW = new Date(Date.UTC(2026, 4, 15, 12, 0, 0));
+    const client = buildClient(() =>
+      ok({
+        comments: [
+          makeComment(1, { created_at: '2025-01-01 00:00:00' }),
+          makeComment(2, { created_at: '2026-06-01 12:00:00' }),
+        ],
+      }),
+    );
+
+    const result = await getUserComments(
+      client,
+      { username: 'thomas', since: '2026-01-01' },
+      NOW,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value.comments.map((c) => c.id)).toEqual([2]);
+  });
+
+  it('includes edited old comments when updated_at >= since (Bucket A1)', async () => {
+    const NOW = new Date(Date.UTC(2026, 4, 15, 12, 0, 0));
+    const client = buildClient(() =>
+      ok({
+        comments: [
+          {
+            id: 99,
+            created_at: '2025-01-01 00:00:00',
+            updated_at: '2026-06-01 12:00:00',
+            message: 'edited late',
+          },
+        ],
+      }),
+    );
+
+    const result = await getUserComments(
+      client,
+      { username: 'thomas', since: '2026-01-01' },
+      NOW,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value.comments).toHaveLength(1);
+    expect(result.value.comments[0]?.id).toBe(99);
+  });
+
+  it('returns a validation error when since is unparseable (Bucket A1)', async () => {
+    const client = buildClient(() => ok({ comments: [] }));
+
+    const result = await getUserComments(client, {
+      username: 'thomas',
+      since: 'not-a-date',
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected err');
+    expect(result.error.code).toBe('validation');
+  });
+
   it('propagates an upstream 404 from the underlying client', async () => {
     const failure = upstreamNotFound('profile not found');
     const client = buildClient(() => err(failure));
@@ -167,5 +245,81 @@ describe('getUserComments', () => {
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('expected err');
     expect(result.error.code).toBe('upstream_not_found');
+  });
+
+  it('surfaces post.id/title/permalink from raw upstream comment.post (Bucket P)', async () => {
+    const client = buildClient(() =>
+      ok({
+        comments: [
+          {
+            id: 501,
+            created_at: '2026-05-10 10:00:00',
+            message: 'with post info',
+            post: {
+              id: 9001,
+              title: 'Source thread',
+              permalink: 'https://example.test/p/9001',
+            },
+          },
+        ],
+      }),
+    );
+
+    const result = await getUserComments(client, { username: 'thomas' });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    const comment = result.value.comments[0];
+    expect(comment?.post?.id).toBe(9001);
+    expect(comment?.post?.title).toBe('Source thread');
+    expect(comment?.post?.permalink).toBe('https://example.test/p/9001');
+  });
+
+  it('sets pagination.has_more=true when limit truncates a page with remaining matching items (Bucket R)', async () => {
+    const NOW = new Date(Date.UTC(2026, 4, 15, 12, 0, 0));
+    const client = buildClient((_path, query) => {
+      const page = Number(query?.page ?? 1);
+      if (page !== 1) {
+        return ok({ comments: { data: [], has_more: false } });
+      }
+      return ok({
+        comments: {
+          data: [
+            makeComment(1, { created_at: '2026-05-10 10:00:00' }),
+            makeComment(2, { created_at: '2026-05-10 09:00:00' }),
+            makeComment(3, { created_at: '2026-05-10 08:00:00' }),
+          ],
+          has_more: false,
+        },
+      });
+    });
+
+    const result = await getUserComments(
+      client,
+      { username: 'thomas', since: '2026-05-01', limit: 2 },
+      NOW,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value.comments).toHaveLength(2);
+    expect(result.value.pagination.has_more).toBe(true);
+  });
+
+  it('sets pagination.has_more=false when scan exhausts upstream within limit (Bucket R)', async () => {
+    const client = buildClient(() =>
+      ok({
+        comments: {
+          data: [makeComment(1), makeComment(2)],
+          has_more: false,
+        },
+      }),
+    );
+
+    const result = await getUserComments(client, { username: 'thomas', limit: 50 });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value.pagination.has_more).toBe(false);
   });
 });

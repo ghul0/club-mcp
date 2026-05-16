@@ -4,7 +4,19 @@ import type { Result } from '../result.js';
 import { err, ok } from '../result.js';
 import type { AppError } from '../errors.js';
 import { validationError } from '../errors.js';
-import { SpacesResponseSchema, type SpaceListItem } from '../schemas/spaces.js';
+import { concurrentMap } from '../concurrency.js';
+import { MembersResponseSchema, type Member } from '../schemas/members.js';
+import {
+  SpacesResponseSchema,
+  PublicSpaceSchema,
+  toPublicSpace,
+  type SpaceListItem,
+  type PublicSpace,
+} from '../schemas/spaces.js';
+
+export const ListSpacesOutputSchema = z.object({
+  spaces: z.array(PublicSpaceSchema),
+});
 
 export const ListSpacesInputSchema = z
   .object({
@@ -15,9 +27,13 @@ export const ListSpacesInputSchema = z
 
 export type ListSpacesInput = z.input<typeof ListSpacesInputSchema>;
 
+export type SpaceWithMembers = PublicSpace;
+
 export interface ListSpacesOutput {
-  readonly spaces: readonly SpaceListItem[];
+  readonly spaces: readonly PublicSpace[];
 }
+
+const SPACE_MEMBER_CONCURRENCY = 4;
 
 const formatIssues = (error: z.ZodError): string => {
   const issues = error.issues.slice(0, 3).map((i) => {
@@ -36,6 +52,30 @@ const extractSpaces = (response: z.infer<typeof SpacesResponseSchema>): readonly
   return raw.data;
 };
 
+const extractMembers = (response: z.infer<typeof MembersResponseSchema>): readonly Member[] => {
+  const raw = response.members;
+  if (Array.isArray(raw)) {
+    return raw;
+  }
+  return raw.data;
+};
+
+const fetchSpaceMembers = async (
+  client: GetClient,
+  slug: string,
+  memberLimit: number,
+): Promise<Result<readonly Member[], AppError>> => {
+  const path = `/spaces/${encodeURIComponent(slug)}/members`;
+  const response = await client.get(path, MembersResponseSchema, {
+    page: 1,
+    per_page: memberLimit,
+  });
+  if (!response.ok) {
+    return err(response.error);
+  }
+  return ok(extractMembers(response.value).slice(0, memberLimit));
+};
+
 export const listSpaces = async (
   client: GetClient,
   input?: ListSpacesInput,
@@ -44,13 +84,35 @@ export const listSpaces = async (
   if (!parsed.success) {
     return err(validationError(formatIssues(parsed.error)));
   }
-
+  const { include_members, member_limit } = parsed.data;
 
   const response = await client.get('/spaces/all-spaces', SpacesResponseSchema);
-
   if (!response.ok) {
     return err(response.error);
   }
+  const spaces = extractSpaces(response.value);
 
-  return ok({ spaces: extractSpaces(response.value) });
+  if (!include_members || spaces.length === 0) {
+    return ok({ spaces: spaces.map((s) => toPublicSpace(s)) });
+  }
+
+  const memberResults = await concurrentMap(
+    spaces,
+    (space) => fetchSpaceMembers(client, space.slug, member_limit),
+    SPACE_MEMBER_CONCURRENCY,
+  );
+
+  const enriched: PublicSpace[] = [];
+  for (let i = 0; i < spaces.length; i += 1) {
+    const space = spaces[i];
+    const result = memberResults[i];
+    if (!space || !result) {
+      continue;
+    }
+    if (!result.ok) {
+      return err(result.error);
+    }
+    enriched.push(toPublicSpace(space, result.value));
+  }
+  return ok({ spaces: enriched });
 };

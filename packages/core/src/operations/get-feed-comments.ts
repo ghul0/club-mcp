@@ -6,8 +6,16 @@ import type { AppError } from '../errors.js';
 import { validationError } from '../errors.js';
 import type { Page, PageRequest } from '../pagination.js';
 import { paginate } from '../pagination.js';
-import type { Comment } from '../schemas/comments.js';
-import { CommentsResponseSchema } from '../schemas/comments.js';
+import type { Comment, PublicComment } from '../schemas/comments.js';
+import {
+  CommentsResponseSchema,
+  PublicCommentSchema,
+  toPublicComment,
+} from '../schemas/comments.js';
+
+export const GetFeedCommentsOutputSchema = z.object({
+  comments: z.array(PublicCommentSchema),
+});
 
 export const GetFeedCommentsInputSchema = z
   .object({
@@ -19,7 +27,7 @@ export const GetFeedCommentsInputSchema = z
 export type GetFeedCommentsInput = z.input<typeof GetFeedCommentsInputSchema>;
 
 export interface GetFeedCommentsOutput {
-  readonly comments: readonly Comment[];
+  readonly comments: readonly PublicComment[];
 }
 
 const PER_PAGE = 100;
@@ -83,5 +91,8 @@ export const getFeedComments = async (
     return err(result.error);
   }
 
-  return ok({ comments: result.value });
+  const comments: PublicComment[] = result.value.map((c) =>
+    toPublicComment(c, { includeReactionsCount: true, includeStatus: true }),
+  );
+  return ok({ comments });
 };

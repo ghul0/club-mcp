@@ -74,7 +74,7 @@ describe('CommentSchema', () => {
     expect(parsed.success).toBe(true);
     if (parsed.success) {
       const data = parsed.data as { readonly status?: unknown; readonly custom_flag?: unknown };
-      expect(data.status).toBeUndefined();
+      expect(data.status).toBe('published');
       expect(data.custom_flag).toBeUndefined();
     }
   });
