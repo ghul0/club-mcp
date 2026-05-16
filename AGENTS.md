@@ -11,13 +11,14 @@ Read before coding:
 - `llms.txt`
 - `docs/stack-decision.md`
 - `docs/adr/001-typescript-first.md`
-- `docs/adr/002-hosted-auth-oauth-resource-server.md`
-- `docs/adr/003-hosted-credential-connect-flow.md`
 - `docs/adr/004-pnpm-monorepo-packages.md`
 - `docs/adr/005-distribution-targets.md`
 - `docs/adr/006-read-only-v1.md`
 - `docs/adr/007-base-url-policy.md`
 - `docs/adr/008-error-model.md`
+- `docs/adr/016-mcp-error-envelope.md`
+- `docs/adr/017-decision-log-policy.md`
+- `docs/adr/019-hosted-auth-basic-pass-through.md` (supersedes ADRs 002/003/010/011/014)
 
 ## Hard rules
 
