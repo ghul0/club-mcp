@@ -35,7 +35,7 @@
     "@hhc-mcp/core": "workspace:*",
     "@hono/node-server": "^1.14.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "hono": "^4.7.0",
+    "hono": "^4.12.19",
     "jose": "^5.9.0",
     "zod": "^3.24.0"
   },
