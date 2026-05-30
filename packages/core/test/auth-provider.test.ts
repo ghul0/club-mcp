@@ -71,6 +71,33 @@ describe('createHttpClient auth provider', () => {
     expect(calls).toBe(2);
   });
 
+  it('retries a network error on the post-refresh attempt using the transient budget', async () => {
+    let calls = 0;
+    let nonce = 'stale';
+    server.use(
+      http.get(`${BASE}${PREFIX}/api/ping`, () => {
+        calls += 1;
+        if (calls === 1) return HttpResponse.json({}, { status: 401 });
+        if (calls === 2) return HttpResponse.error();
+        return HttpResponse.json({ ok: true, name: 'pong' });
+      }),
+    );
+    const onUnauthorized = vi.fn(() => {
+      nonce = 'fresh';
+      return Promise.resolve(true);
+    });
+    const auth: AuthProvider = {
+      headers: () => ({ cookie: 'c=1', 'x-wp-nonce': nonce }),
+      onUnauthorized,
+    };
+    const client = createHttpClient({ baseUrl: BASE, maxRetries: 1, auth });
+    const result = await client.get('/api/ping', PingSchema);
+
+    expect(isOk(result)).toBe(true);
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    expect(calls).toBe(3);
+  });
+
   it('returns the original 401 when refresh yields false', async () => {
     server.use(
       http.get(`${BASE}${PREFIX}/api/ping`, () => HttpResponse.json({}, { status: 401 })),

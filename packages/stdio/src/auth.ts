@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import {
   createBasicAuthProvider,
   err,
@@ -9,7 +10,9 @@ import {
 } from '@hhc-mcp/core';
 import type { AuthFileData, AuthFileStore } from './auth-file.js';
 
-export type AuthMode = 'auto' | 'basic' | 'cookie';
+const AuthModeSchema = z.enum(['auto', 'basic', 'cookie']);
+
+export type AuthMode = z.infer<typeof AuthModeSchema>;
 
 const REFRESH_TIMEOUT_MS = 20_000;
 
@@ -100,11 +103,11 @@ export const resolveAuth = (deps: ResolveAuthDeps): Result<ResolvedAuth, AppErro
   const { env } = deps;
   const fileData: AuthFileData = deps.store ? deps.store.read() : {};
 
-  const modeRaw = env['HHC_AUTH_MODE'] ?? 'auto';
-  if (modeRaw !== 'auto' && modeRaw !== 'basic' && modeRaw !== 'cookie') {
-    return err(validationError(`HHC_AUTH_MODE must be one of auto|basic|cookie, received "${modeRaw}"`));
+  const modeParse = AuthModeSchema.safeParse(env['HHC_AUTH_MODE'] ?? 'auto');
+  if (!modeParse.success) {
+    return err(validationError('HHC_AUTH_MODE must be one of auto, basic, or cookie'));
   }
-  const mode: AuthMode = modeRaw;
+  const mode: AuthMode = modeParse.data;
 
   const user = pick(env['HHC_USER'], fileData.user);
   const appPass = pick(env['HHC_APP_PASS'], fileData.app_pass);
