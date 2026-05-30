@@ -11,12 +11,18 @@ import {
   upstreamUnauthorized,
 } from '../errors.js';
 
+export interface AuthProvider {
+  headers: () => Promise<Record<string, string>> | Record<string, string>;
+  onUnauthorized?: () => Promise<boolean>;
+}
+
 export interface HttpClientOptions {
   readonly baseUrl: string;
   readonly allowedBaseUrls?: ReadonlyArray<string>;
   readonly timeoutMs?: number;
   readonly maxRetries?: number;
   readonly authHeader?: () => string;
+  readonly auth?: AuthProvider;
   readonly userAgent?: string;
   readonly fetchImpl?: typeof globalThis.fetch;
 }
@@ -135,15 +141,18 @@ export function createHttpClient(options: HttpClientOptions): GetClient {
   const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
   const userAgent = options.userAgent ?? DEFAULT_USER_AGENT;
   const fetchImpl: typeof globalThis.fetch = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
-  const authHeader = options.authHeader;
+  const authHeaderFn = options.authHeader;
+  const provider: AuthProvider | undefined =
+    options.auth ??
+    (authHeaderFn ? { headers: (): Record<string, string> => ({ authorization: authHeaderFn() }) } : undefined);
 
   const performOnce = async (url: string): Promise<Response | AppError> => {
     const headers: Record<string, string> = {
       accept: 'application/json',
       'user-agent': userAgent,
     };
-    if (authHeader) {
-      headers.authorization = authHeader();
+    if (provider) {
+      Object.assign(headers, await provider.headers());
     }
     try {
       const response = await fetchImpl(url, {
@@ -166,6 +175,7 @@ export function createHttpClient(options: HttpClientOptions): GetClient {
     schema: TSchema,
   ): Promise<Result<z.infer<TSchema>, AppError>> => {
     let lastError: AppError = externalService('no attempts performed');
+    let refreshed = false;
     const totalAttempts = maxRetries + 1;
     for (let attempt = 0; attempt < totalAttempts; attempt++) {
       const outcome = await performOnce(url);
@@ -179,8 +189,31 @@ export function createHttpClient(options: HttpClientOptions): GetClient {
         return err(lastError);
       }
 
-      const response = outcome;
-      const status = response.status;
+      let response = outcome;
+      let status = response.status;
+
+      if ((status === 401 || status === 403) && provider?.onUnauthorized && !refreshed) {
+        refreshed = true;
+        let didRefresh = false;
+        try {
+          didRefresh = await provider.onUnauthorized();
+        } catch {
+          didRefresh = false;
+        }
+        if (didRefresh) {
+          const retry = await performOnce(url);
+          if (!(retry instanceof Response)) {
+            lastError = retry;
+            if (attempt < totalAttempts - 1) {
+              await sleep(backoffMs(attempt));
+              continue;
+            }
+            return err(lastError);
+          }
+          response = retry;
+          status = response.status;
+        }
+      }
 
       if (status >= 300 && status <= 399) {
         return err(externalService(`upstream redirect not allowed (${String(status)})`));

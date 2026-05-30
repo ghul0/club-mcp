@@ -13,15 +13,6 @@
     "test": "pnpm -r test",
     "review:local": "tsx scripts/local-review.ts"
   },
-  "lint-staged": {
-    "packages/**/*.ts": [
-      "pnpm -C packages/core lint --fix || true",
-      "pnpm typecheck"
-    ],
-    "scripts/**/*.ts": [
-      "pnpm typecheck:scripts"
-    ]
-  },
   "devDependencies": {
     "@commitlint/cli": "^21.0.1",
     "@commitlint/config-conventional": "^21.0.1",

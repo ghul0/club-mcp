@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 import process from 'node:process';
-import { createHttpClient, loadBasicAuthFromEnv } from '@hhc-mcp/core';
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { createHttpClient } from '@hhc-mcp/core';
 import { loadStdioConfig } from './env.js';
+import { resolveAuth } from './auth.js';
+import { createAuthFileStore, type AuthFileStore } from './auth-file.js';
 import { createLogger, type Logger } from './logger.js';
 import { runStdioServer } from './server.js';
 
@@ -30,7 +34,12 @@ export const main = async (deps: MainDeps): Promise<void> => {
   }
 
   const config = configResult.value;
-  const authResult = loadBasicAuthFromEnv(deps.env);
+
+  const authFile = deps.env['HHC_AUTH_FILE'];
+  const store: AuthFileStore | undefined =
+    authFile !== undefined && authFile !== '' ? createAuthFileStore(authFile) : undefined;
+
+  const authResult = resolveAuth({ env: deps.env, baseUrl: config.baseUrl, store });
   if (!authResult.ok) {
     logger.error('config error', {
       code: authResult.error.code,
@@ -41,7 +50,7 @@ export const main = async (deps: MainDeps): Promise<void> => {
   }
   const client = createHttpClient({
     baseUrl: config.baseUrl,
-    authHeader: authResult.value,
+    ...authResult.value,
   });
 
   await runStdioServer({ config, client, logger });
@@ -52,8 +61,11 @@ const isEntrypoint = (): boolean => {
   if (argv1 === undefined) {
     return false;
   }
-  const entryUrl = new URL(`file://${argv1}`).href;
-  return import.meta.url === entryUrl;
+  try {
+    return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(argv1);
+  } catch {
+    return false;
+  }
 };
 
 if (isEntrypoint()) {

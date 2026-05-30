@@ -27,15 +27,28 @@ Inside the monorepo, the binary is available after `pnpm build` at
 ## Configuration
 
 The stdio server is configured entirely through environment variables.
-Authentication uses a WordPress Application Password — not your login
-password and not a browser cookie. All three variables are validated via Zod
-at startup; an invalid or missing value exits with a typed validation error.
+`HHC_BASE_URL` is validated via Zod at startup. Authentication supports two
+methods, selected by `HHC_AUTH_MODE` (default `auto`): a WordPress Application
+Password (HTTP Basic) or a WordPress session cookie + nonce. `auto` prefers the
+Application Password when its credentials are present and falls back to cookie
+auth otherwise — useful when the club has Application Passwords disabled.
 
 | Variable        | Required | Description                                                                                                  |
 | --------------- | -------- | ------------------------------------------------------------------------------------------------------------ |
 | `HHC_BASE_URL`  | yes      | Base URL of the club, e.g. `https://club.hyperhuman.pl`. Used as the root for the Fluent Community REST API. |
-| `HHC_USER`      | yes      | Your WordPress login (username or email).                                                                    |
-| `HHC_APP_PASS`  | yes      | A WordPress Application Password (Settings → Profile → Application Passwords; 24-char, space-grouped).       |
+| `HHC_AUTH_MODE` | no       | `auto` (default), `basic`, or `cookie`. `auto` = Basic if Application Password creds present, else cookie.    |
+| `HHC_USER`      | basic    | WordPress login (username or email). Required for Basic auth.                                                |
+| `HHC_APP_PASS`  | basic    | WordPress Application Password (Settings → Profile → Application Passwords; 24-char, space-grouped).         |
+| `HHC_COOKIE`    | cookie   | `Cookie` header value (e.g. `wordpress_logged_in_…=…`). Required for cookie auth unless supplied via the file. |
+| `HHC_WP_NONCE`  | cookie   | `X-WP-Nonce` value (alias: `HHC_NONCE`). Optional; auto-refreshed on 401/403 if a cookie is present.          |
+| `HHC_AUTH_FILE` | no       | Path to a JSON auth file holding `cookie`/`nonce`/`user`/`app_pass`. Env vars override file fields.          |
+
+Cookie auth requires a valid `X-WP-Nonce`, which WordPress expires (~12h). When
+a refreshable cookie is present, the server re-fetches the nonce automatically on
+a `401/403` and (if `HHC_AUTH_FILE` is set) persists the new nonce back to the
+file. Point `HHC_AUTH_FILE` at the `hhc` CLI's `~/.config/hyperhuman-club/auth.json`
+to share one credential source. See
+[docs/adr/020-local-cookie-auth-fallback.md](https://github.com/ghul0/club-mcp/blob/main/docs/adr/020-local-cookie-auth-fallback.md).
 
 ## Claude Desktop config
 
@@ -86,7 +99,10 @@ for the full tool contracts.
 - 100% read-only. No write endpoints are reachable from this server (ADR-006);
   non-GET HTTP verbs are excluded both by lint and a runtime invariant test.
 - Credentials live in your local environment only; no telemetry, no remote
-  storage, no writes to disk.
+  storage. The only disk write is to your local `HHC_AUTH_FILE` (when set):
+  cookie mode persists a refreshed `X-WP-Nonce` back to that file, updating
+  only `nonce`/`nonce_refreshed_at` and leaving other fields untouched. With
+  no `HHC_AUTH_FILE` the server writes nothing to disk.
 - Logs go to stderr, never stdout (stdout is reserved for JSON-RPC).
   Authorization headers and credential keys are redacted via `redactKeys`
   from `@hhc-mcp/core`.
