@@ -2,6 +2,11 @@
 
 All notable changes to `@hhc-mcp/core` and `@hhc-mcp/stdio` are documented here. This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.1] - 2026-05-30
+
+### Fixed
+- **`npx -y @hhc-mcp/stdio` and global installs now start the server.** The bin's `isEntrypoint()` compared `import.meta.url` to `file://process.argv[1]`; when launched through the `.bin` symlink (npx / `npm i -g`) those paths differ, so `main()` never ran and the process exited silently. Both sides are now resolved with `realpathSync` before comparison. (`@hhc-mcp/core@0.1.1` is a lockstep version bump with no code change.)
+
 ## [0.1.0] - 2026-05-30
 
 ### Added
