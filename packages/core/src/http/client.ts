@@ -203,7 +203,12 @@ export function createHttpClient(options: HttpClientOptions): GetClient {
         if (didRefresh) {
           const retry = await performOnce(url);
           if (!(retry instanceof Response)) {
-            return err(retry);
+            lastError = retry;
+            if (attempt < totalAttempts - 1) {
+              await sleep(backoffMs(attempt));
+              continue;
+            }
+            return err(lastError);
           }
           response = retry;
           status = response.status;
