@@ -1,5 +1,7 @@
-import { readFileSync, statSync, existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { createLogger } from '../src/logger.js';
@@ -77,5 +79,36 @@ describe('main()', () => {
     expect(exitCodes).toHaveLength(0);
     expect(runSpy).toHaveBeenCalledTimes(1);
     runSpy.mockRestore();
+  });
+});
+
+describe('bin via .bin symlink (npx scenario)', () => {
+  it('starts main() and lists tools when launched through a symlink', () => {
+    if (!existsSync(DIST_INDEX)) {
+      return;
+    }
+    const dir = mkdtempSync(join(tmpdir(), 'hhc-bin-'));
+    const link = join(dir, 'hhc-mcp');
+    symlinkSync(DIST_INDEX, link);
+    const request =
+      `${JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 't', version: '0' } },
+      })}\n${JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} })}\n`;
+    const result = spawnSync('node', [link], {
+      input: request,
+      encoding: 'utf8',
+      timeout: 15000,
+      env: {
+        ...process.env,
+        HHC_BASE_URL: 'https://club.hyperhuman.pl',
+        HHC_AUTH_MODE: 'cookie',
+        HHC_COOKIE: 'c=1',
+      },
+    });
+    rmSync(dir, { recursive: true, force: true });
+    expect(result.stdout).toContain('"tools"');
   });
 });

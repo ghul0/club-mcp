@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import process from 'node:process';
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { createHttpClient } from '@hhc-mcp/core';
 import { loadStdioConfig } from './env.js';
 import { resolveAuth } from './auth.js';
@@ -59,8 +61,11 @@ const isEntrypoint = (): boolean => {
   if (argv1 === undefined) {
     return false;
   }
-  const entryUrl = new URL(`file://${argv1}`).href;
-  return import.meta.url === entryUrl;
+  try {
+    return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(argv1);
+  } catch {
+    return false;
+  }
 };
 
 if (isEntrypoint()) {
