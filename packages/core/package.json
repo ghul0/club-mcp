@@ -1,6 +1,6 @@
 {
   "name": "@hhc-mcp/core",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "description": "Framework-agnostic core library: GET-only HTTP client, Zod envelopes, and 13 read-only operations for the Hyper Human Club / Fluent Community REST API.",
   "keywords": [
     "mcp",
