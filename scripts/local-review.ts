@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 
 const ReviewerSchema = z.object({
-  role: z.enum(['a', 'b']),
+  role: z.enum(['a']),
   model: z.string(),
   focus: z.string(),
 });
@@ -22,14 +22,7 @@ const REVIEWERS: ReadonlyArray<Reviewer> = [
       'Zod completeness at every external and tool boundary.',
       'ADR-006 read-only invariant; ADR-007 base URL policy; ADR-008 typed errors; ADR-016 error envelope.',
       'Naming consistency: club_* tools, @hhc-mcp/* packages.',
-    ].join('\n  - '),
-  },
-  {
-    role: 'b',
-    model: 'claude-agent-sdk/claude-opus-4-7',
-    focus: [
       'Security: no credentials/tokens/secrets/payloads in code, tests, fixtures, or logs.',
-      'Error envelope (ADR-016) used for expected failures.',
       'Package boundaries (ADR-004); no deep cross-package imports.',
       'KISS over SOLID; complexity justified by spec.',
       'Tool surface limited to docs/read-only-tools.md allowlist.',
@@ -41,7 +34,7 @@ const REVIEWERS: ReadonlyArray<Reviewer> = [
 const VerdictRegex = /^\s*VERDICT:\s*(APPROVE|REQUEST_CHANGES)/im;
 
 type ReviewResult = {
-  role: 'a' | 'b';
+  role: 'a';
   verdict: 'APPROVE' | 'REQUEST_CHANGES' | 'UNPARSED';
   body: string;
   error?: string;
@@ -134,7 +127,7 @@ function printResult(result: ReviewResult): void {
 
 async function main(): Promise<void> {
   if (process.env['SKIP_LOCAL_REVIEW'] === '1') {
-    process.stderr.write('SKIP_LOCAL_REVIEW=1 — bypassing dual review (allowed for emergencies, document why)\n');
+    process.stderr.write('SKIP_LOCAL_REVIEW=1 — bypassing review (allowed for emergencies, document why)\n');
     return;
   }
 
@@ -149,17 +142,17 @@ async function main(): Promise<void> {
   await writeFile(diffPath, diff, 'utf8');
 
   try {
-    process.stderr.write(`Running dual review on ${base}..${head} (${diff.split('\n').length} diff lines)...\n`);
+    process.stderr.write(`Running review on ${base}..${head} (${diff.split('\n').length} diff lines)...\n`);
     const results = await Promise.all(REVIEWERS.map((r) => runReviewer(r, diffPath, base, head)));
     for (const r of results) printResult(r);
 
     const allApproved = results.every((r) => r.verdict === 'APPROVE');
     if (!allApproved) {
-      process.stderr.write('\n' + ansi('31', 'DUAL REVIEW BLOCKED PUSH') + '\n');
+      process.stderr.write('\n' + ansi('31', 'REVIEW BLOCKED PUSH') + '\n');
       process.stderr.write('To override (document reason in PR body): SKIP_LOCAL_REVIEW=1 git push\n');
       process.exit(1);
     }
-    process.stderr.write('\n' + ansi('32', 'BOTH REVIEWERS APPROVED') + '\n');
+    process.stderr.write('\n' + ansi('32', 'REVIEWER APPROVED') + '\n');
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
