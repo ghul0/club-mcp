@@ -1,6 +1,6 @@
 {
   "name": "@hhc-mcp/stdio",
-  "version": "0.0.3",
+  "version": "0.1.1",
   "description": "Local stdio Model Context Protocol (MCP) server exposing 13 read-only Hyper Human Club tools to Claude Desktop, Cursor, and any MCP-compliant client.",
   "keywords": [
     "mcp",

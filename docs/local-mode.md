@@ -6,8 +6,10 @@ Desktop to it. The server is read-only and never leaves your machine.
 ## Prerequisites
 
 - Node.js 22+ and `pnpm` (or `npm`).
-- A WordPress account on your Hyper Human Club instance with the
-  "Application Passwords" plugin enabled.
+- A WordPress account on your Hyper Human Club instance, authenticated by
+  either a WordPress Application Password (sections 1 and 3 below) or a
+  session cookie + nonce (section 3b). Application Passwords is preferred
+  but not required — use cookie auth when the feature is disabled at the club.
 - Claude Desktop installed (macOS / Windows / Linux).
 
 ## 1. Generate a WordPress Application Password
@@ -70,6 +72,42 @@ Notes:
   per deployment.
 - HTTPS is mandatory. HTTP base URLs are rejected on startup.
 - A trailing slash on the base URL is tolerated but not required.
+
+## 3b. Cookie auth (when Application Passwords is unavailable)
+
+If the club has WordPress Application Passwords disabled, the server can
+authenticate with a session cookie + nonce instead. Set `HHC_AUTH_MODE` to
+`auto` (the default) or `cookie`. In `auto`, the server uses the Application
+Password when `HHC_USER` + `HHC_APP_PASS` are present and falls back to cookie
+auth otherwise.
+
+WordPress cookie auth requires an `X-WP-Nonce` that expires (~12h). When a
+cookie is present, the server refreshes the nonce automatically on a `401/403`
+and persists the new value if an auth file is configured. The simplest setup
+reuses the `hhc` CLI's credential file, which already keeps a fresh
+cookie + nonce:
+
+```json
+{
+  "mcpServers": {
+    "hyperhuman-club": {
+      "command": "npx",
+      "args": ["-y", "@hhc-mcp/stdio"],
+      "env": {
+        "HHC_BASE_URL": "https://club.hyperhuman.pl",
+        "HHC_AUTH_MODE": "auto",
+        "HHC_AUTH_FILE": "/home/you/.config/hyperhuman-club/auth.json"
+      }
+    }
+  }
+}
+```
+
+Alternatively pass the cookie inline with `HHC_COOKIE` and `HHC_WP_NONCE`
+(env vars override the auth file). Without an auth file, a refreshed nonce is
+held in memory for the process lifetime only. Once Application Passwords gets
+enabled, add `HHC_USER` + `HHC_APP_PASS` and `auto` switches to Basic. See
+`docs/adr/020-local-cookie-auth-fallback.md`.
 
 ## 4. Restart Claude Desktop
 
