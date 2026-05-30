@@ -2,6 +2,19 @@
 
 All notable changes to `@hhc-mcp/core` and `@hhc-mcp/stdio` are documented here. This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.0] - 2026-05-30
+
+### Added
+- **Cookie + nonce auth fallback for `@hhc-mcp/stdio`** (ADR-020). The local server now authenticates with either a WordPress Application Password (HTTP Basic, existing) or a WordPress session cookie + `X-WP-Nonce`, selected by `HHC_AUTH_MODE` (`auto` | `basic` | `cookie`). `auto` prefers Basic when its credentials are present and falls back to cookie auth otherwise, so the server works when Application Passwords is disabled at the club and switches to Basic automatically once it is enabled.
+- **`AuthProvider` contract in `@hhc-mcp/core`**: an `auth` option on the HTTP client (`headers()` plus an optional `onUnauthorized()`), with a one-shot `401/403` refresh-retry that does not consume the transient retry budget. The legacy `authHeader` callback still works.
+- **Auth-file store (`HHC_AUTH_FILE`)** in stdio: reads `cookie`/`nonce`/`user`/`app_pass` (env vars take precedence; `HHC_WP_NONCE` with `HHC_NONCE` alias), refreshes the nonce from site-root HTML on `401/403`, and persists it back atomically (unique temp + rename, cleanup on failure, symlinks resolved, unknown fields preserved). Point it at the `hhc` CLI's `~/.config/hyperhuman-club/auth.json` to share one credential source.
+
+### Fixed
+- **`lint-staged` config** now lives in `lint-staged.config.mjs` with function entries, so local commits run. The previous `package.json` entry appended staged paths and `|| true` to eslint as patterns, failing every local commit touching `packages/**/*.ts`.
+
+### Notes
+- The GET-only read-only invariant (ADR-006) is unchanged; cookie+nonce cannot perform writes through the client.
+
 ## [0.0.3] - 2026-05-16
 
 ### Fixed
